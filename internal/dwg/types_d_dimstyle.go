@@ -2,7 +2,7 @@ package dwg
 
 // DimStyle §20.4.68 (R2000+ layout).
 type DimStyle struct {
-	dTableEntry
+	TableEntry
 	DIMPOST, DIMAPOST                                         string  // 3, 4
 	DIMSCALE, DIMASZ, DIMEXO, DIMDLI, DIMEXE, DIMRND, DIMDLE  float64 // 40-46
 	DIMTP, DIMTM                                              float64 // 47, 48
@@ -26,10 +26,10 @@ type DimStyle struct {
 	DIMATFIT                                                  int16   // 289
 	DIMFXLON                                                  bool    // 290 (R2007+)
 	DIMTXTDIRECTION                                           bool    // 295 (R2010+)
-	DIMALTMZF                                                 float64 // R2010+
-	DIMALTMZS                                                 string  // R2010+
-	DIMMZF                                                    float64 // R2010+
-	DIMMZS                                                    string  // R2010+
+	DIMALTMZF                                                 float64 `conv:"derived"` // R2010+ (no DXF group)
+	DIMALTMZS                                                 string  `conv:"derived"` // R2010+ (no DXF group)
+	DIMMZF                                                    float64 `conv:"derived"` // R2010+ (no DXF group)
+	DIMMZS                                                    string  `conv:"derived"` // R2010+ (no DXF group)
 	DIMLWD, DIMLWE                                            int16   // 371, 372
 	Flag0                                                     bool    // 70 bit 1
 	DIMTXSTY, DIMLDRBLK, DIMBLK, DIMBLK1, DIMBLK2             Ref     // 340-344

@@ -25,9 +25,9 @@ func init() {
 // The DIMSTYLE control has an extra RC-counted list of hard owner handles (Extra), not in the spec.
 type TableControl struct {
 	kind    int
-	Entries []Ref
-	Special []Ref
-	Extra   []Ref
+	Entries []Ref `conv:"derived"` // the records owning this control (DXF lists them as records)
+	Special []Ref `conv:"derived"`
+	Extra   []Ref `conv:"derived"` // not written by ODA
 }
 
 func (b *TableControl) specialCount() int {
@@ -63,16 +63,16 @@ func (b *TableControl) handles(c *codec, o *Object) {
 	}
 }
 
-// dTableEntry holds the fields common to every table record.
-type dTableEntry struct {
+// TableEntry holds the fields common to every table record.
+type TableEntry struct {
 	Name      string // 2
-	Flag64    bool   // 70 bit 64
-	XrefIndex int16  // xrefindex+1
+	Flag64    bool   `conv:"derived"` // 70 bit 64 (referenced); ODA does not write it
+	XrefIndex int16  `conv:"derived"` // xrefindex+1 (R2004 only)
 	Xdep      bool   // 70 bit 16
-	XrefBlock Ref    // external reference block handle (hard pointer)
+	XrefBlock Ref    `conv:"derived"` // external reference block handle (hard pointer)
 }
 
-func (e *dTableEntry) dData(c *codec) {
+func (e *TableEntry) dData(c *codec) {
 	c.TV(&e.Name)
 	c.B(&e.Flag64)
 	if !c.R2007 { // absent in R2007+ (observed; the spec lists it as common)
@@ -83,24 +83,25 @@ func (e *dTableEntry) dData(c *codec) {
 
 // BlockHeader §20.4.52 (BLOCK_RECORD).
 type BlockHeader struct {
-	dTableEntry
-	Anonymous    bool
-	HasAttribs   bool
-	IsXref       bool
-	XrefOverlaid bool
-	Loaded       bool
-	BasePoint    [3]float64 // 10
-	XrefPath     string     // 1
-	InsertCounts []byte     // non-zero RCs, one per insert handle
-	Description  string     // 4
+	TableEntry
+	// The BLOCK entity in the DXF BLOCKS section carries these, not the BLOCK_RECORD.
+	Anonymous    bool       `conv:"derived"`
+	HasAttribs   bool       `conv:"derived"`
+	IsXref       bool       `conv:"derived"`
+	XrefOverlaid bool       `conv:"derived"`
+	Loaded       bool       `conv:"derived"`
+	BasePoint    [3]float64 `conv:"derived"` // 10
+	XrefPath     string     `conv:"derived"` // 1
+	InsertCounts []byte     `conv:"derived"` // non-zero RCs, one per insert handle
+	Description  string     `conv:"derived"` // 4 (BLOCK entity)
 	Preview      []byte     // 310
 	InsertUnits  int16      // 70
 	Explodable   bool       // 280
 	Scaling      byte       // 281
-	Block        Ref        // BLOCK entity
-	Entities     []Ref      // owned entities
-	EndBlk       Ref        // ENDBLK entity
-	Inserts      []Ref
+	Block        Ref        `conv:"derived"` // BLOCK entity (DXF: BLOCKS section)
+	Entities     []Ref      `conv:"derived"` // owned entities (DXF: BLOCKS section)
+	EndBlk       Ref        `conv:"derived"` // ENDBLK entity (DXF: BLOCKS section)
+	Inserts      []Ref      `conv:"derived"` // DXF lists them sorted (BLKREFS), so the DWG order is not kept
 	Layout       Ref
 }
 
@@ -164,7 +165,7 @@ func (b *BlockHeader) handles(c *codec, o *Object) {
 
 // Layer §20.4.54.
 type Layer struct {
-	dTableEntry
+	TableEntry
 	Flags     int16 // frozen 1, on 2 (inverted), frz new vp 4, locked 8, plot 16, lineweight 0x03E0
 	Color     CmColor
 	PlotStyle Ref // 390
@@ -193,7 +194,7 @@ func (b *Layer) handles(c *codec, o *Object) {
 
 // Style §20.4.56 (text style, "shapefile").
 type Style struct {
-	dTableEntry
+	TableEntry
 	Vertical    bool
 	IsShapeFile bool
 	FixedHeight float64 // 40
@@ -207,8 +208,9 @@ type Style struct {
 
 func (b *Style) data(c *codec, o *Object) {
 	b.dData(c)
-	c.B(&b.Vertical)
+	// The spec lists Vertical first; real files have the shape-file bit first (DXF 70 bit 1).
 	c.B(&b.IsShapeFile)
+	c.B(&b.Vertical)
 	c.BD(&b.FixedHeight)
 	c.BD(&b.WidthFactor)
 	c.BD(&b.Oblique)
@@ -233,12 +235,12 @@ type LtypeDash struct {
 
 // Ltype §20.4.58.
 type Ltype struct {
-	dTableEntry
+	TableEntry
 	Description   string  // 3
 	PatternLength float64 // 40
 	Alignment     byte    // 72, always 'A'
 	Dashes        []LtypeDash
-	StringArea    []byte // 256 bytes (R2004), 512 bytes when present (R2007+)
+	StringArea    []byte `conv:"derived"` // 256 bytes (R2004), 512 bytes when present (R2007+); rebuilt from DXF 9
 }
 
 func (b *Ltype) hasStringArea(c *codec) bool {
@@ -303,8 +305,8 @@ func dViewMode(c *codec, v *byte) {
 	}
 }
 
-// dLighting holds the R2007+ default lighting fields of VIEW and VPORT.
-type dLighting struct {
+// Lighting holds the R2007+ default lighting fields of VIEW and VPORT.
+type Lighting struct {
 	UseDefaultLights bool    // 292
 	LightingType     byte    // 282
 	Brightness       float64 // 141
@@ -312,7 +314,7 @@ type dLighting struct {
 	Ambient          CmColor // 63
 }
 
-func (l *dLighting) dLightData(c *codec) {
+func (l *Lighting) dLightData(c *codec) {
 	c.B(&l.UseDefaultLights)
 	c.RC(&l.LightingType)
 	c.BD(&l.Brightness)
@@ -322,7 +324,7 @@ func (l *dLighting) dLightData(c *codec) {
 
 // View §20.4.60.
 type View struct {
-	dTableEntry
+	TableEntry
 	Height, Width float64    // 40, 41
 	Center        [2]float64 // 10
 	Target        [3]float64 // 12
@@ -333,7 +335,7 @@ type View struct {
 	BackClip      float64    // 44
 	ViewMode      byte       // 71 (4 bits)
 	RenderMode    byte       // 281
-	dLighting
+	Lighting
 	PaperSpace     bool       // 70 bit 1
 	AssociatedUCS  bool       // 72
 	UCSOrigin      [3]float64 // 110
@@ -364,7 +366,7 @@ func (b *View) data(c *codec, o *Object) {
 	dViewMode(c, &b.ViewMode)
 	c.RC(&b.RenderMode)
 	if c.R2007 {
-		b.dLighting.dLightData(c)
+		b.Lighting.dLightData(c)
 	}
 	c.B(&b.PaperSpace)
 	c.B(&b.AssociatedUCS)
@@ -398,7 +400,7 @@ func (b *View) handles(c *codec, o *Object) {
 
 // UCS §20.4.62.
 type UCS struct {
-	dTableEntry
+	TableEntry
 	Origin    [3]float64 // 10
 	XAxis     [3]float64 // 11
 	YAxis     [3]float64 // 12
@@ -427,7 +429,7 @@ func (b *UCS) handles(c *codec, o *Object) {
 
 // VPort §20.4.64.
 type VPort struct {
-	dTableEntry
+	TableEntry
 	Height       float64    // 40
 	AspectTimesH float64    // 41 (aspect ratio * view height)
 	Center       [2]float64 // 12
@@ -439,7 +441,7 @@ type VPort struct {
 	BackClip     float64    // 44
 	ViewMode     byte       // 71 (4 bits)
 	RenderMode   byte       // 281
-	dLighting
+	Lighting
 	LowerLeft   [2]float64 // 10
 	UpperRight  [2]float64 // 11
 	UCSFollow   bool       // 71 bit 8
@@ -484,7 +486,7 @@ func (b *VPort) data(c *codec, o *Object) {
 	dViewMode(c, &b.ViewMode)
 	c.RC(&b.RenderMode)
 	if c.R2007 {
-		b.dLighting.dLightData(c)
+		b.Lighting.dLightData(c)
 	}
 	c.RD2(&b.LowerLeft)
 	c.RD2(&b.UpperRight)
@@ -526,7 +528,7 @@ func (b *VPort) handles(c *codec, o *Object) {
 
 // AppID §20.4.66.
 type AppID struct {
-	dTableEntry
+	TableEntry
 	Unknown byte // 71
 }
 
@@ -539,7 +541,7 @@ func (b *AppID) handles(c *codec, o *Object) { c.H(&b.XrefBlock) }
 
 // VXTableRecord §20.4.70 (viewport entity header).
 type VXTableRecord struct {
-	dTableEntry
+	TableEntry
 	Flag1    bool // 70 bit 1
 	Viewport Ref  // the viewport entity (soft owner)
 	Prev     Ref  // previous header in chain (hard pointer)
@@ -554,4 +556,15 @@ func (b *VXTableRecord) handles(c *codec, o *Object) {
 	c.H(&b.XrefBlock)
 	c.H(&b.Viewport)
 	c.H(&b.Prev)
+}
+
+// Kind returns the DWG type number of the control object (0x30 BLOCK, 0x32 LAYER, ...).
+func (b *TableControl) Kind() int { return b.kind }
+
+// SetKind sets the control type when the object is built without decoding (DXF import).
+func (b *TableControl) SetKind(t int) {
+	b.kind = t
+	if b.Special == nil && b.specialCount() > 0 {
+		b.Special = make([]Ref, b.specialCount())
+	}
 }
