@@ -94,12 +94,15 @@ const (
 	dByBlock   = 0xC1
 	dTrueColor = 0xC2
 	dACI       = 0xC3
+	dNone      = 0xC8
 )
 
 // dACIGray are ACI colors with an exact RGB, used to pick the 62 that ODA writes for true colors.
 var dACIRGB = map[int32]int16{
 	0xFF0000: 1, 0xFFFF00: 2, 0x00FF00: 3, 0x00FFFF: 4, 0x0000FF: 5, 0xFF00FF: 6, 0xFFFFFF: 7,
 	0x333333: 250, 0x5B5B5B: 251, 0x848484: 252, 0xADADAD: 253, 0xD6D6D6: 254,
+	// nearest ACI as ODA picks it, observed in visual styles
+	0x000000: 18, 0x808080: 8, 0x787878: 8,
 }
 
 // dCmcACI returns the ACI written as 62 for a CMC color.
@@ -111,6 +114,8 @@ func dCmcACI(c *dwg.CmColor) int16 {
 		return 0
 	case dACI:
 		return int16(c.RGB & 0xFF)
+	case dNone:
+		return 257
 	case dTrueColor:
 		if i, ok := dACIRGB[c.RGB&0xFFFFFF]; ok {
 			return i
@@ -127,6 +132,8 @@ func dCmcFromACI(i int16) dwg.CmColor {
 		return dwg.CmColor{RGB: -0x40000000} // 0xC0000000
 	case 0:
 		return dwg.CmColor{RGB: -0x3F000000} // 0xC1000000
+	case 257:
+		return dwg.CmColor{RGB: -0x38000000} // 0xC8000000
 	}
 	return dwg.CmColor{RGB: -0x3D000000 | int32(uint16(i)&0xFF)}
 }
