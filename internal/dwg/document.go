@@ -121,7 +121,7 @@ func (d *Document) decodeObject(buf []byte, off int) *Object {
 	err = catch(func() {
 		o.decodeCommon(c)
 		if mk == nil {
-			return
+			mk = func() Body { return &RawBody{} }
 		}
 		b := mk()
 		b.data(c, o)
