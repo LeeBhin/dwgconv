@@ -168,7 +168,7 @@ func (b *PolylineMesh) data(c *codec, o *Object) {
 // they are derived from the fields (other bits, e.g. closed 512 and plinegen 256, are kept).
 type LWPolyline struct {
 	bNoHandles
-	Flag       int16
+	Flag       int16 `conv:"derived"` // closed/plinegen are carried by DXF 70, the rest is derived
 	ConstWidth float64
 	Elevation  float64
 	Thickness  float64

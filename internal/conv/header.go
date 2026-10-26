@@ -238,7 +238,7 @@ func (x *ctx) setHeaderField(f reflect.Value, e dwg.HeaderDXFVar, g []dxf.Group)
 			return
 		}
 		if t, ok := headerRefTable[e.Field]; ok {
-			if hd := x.byName[t][strings.ToUpper(g[0].Value)]; hd != 0 {
+			if hd := x.byName[t][nameKey(g[0].Value)]; hd != 0 {
 				f.Set(reflect.ValueOf(dwg.Ref{Code: 5, H: hd}))
 			}
 		}

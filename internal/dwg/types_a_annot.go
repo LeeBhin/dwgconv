@@ -17,27 +17,27 @@ type MText struct {
 	TextHeight    float64
 	Attachment    int16
 	DrawingDir    int16
-	ExtHeight     float64
-	ExtWidth      float64
+	ExtHeight     float64 `conv:"derived"`
+	ExtWidth      float64 `conv:"derived"`
 	Value         string
 	LineSpStyle   int16
 	LineSpFactor  float64
-	UnknownBit    bool
+	UnknownBit    bool  `conv:"derived"`
 	BgFlags       int32 // R2004+
 	BgScale       float64
 	BgColor       CmColor
 	BgTransp      int32
-	NotAnnotative bool // R2018+
-	AVersion      int16
-	ADefault      bool
-	ARegApp       Ref
-	AAttachment   int32
-	AXAxis        [3]float64
-	AInsertion    [3]float64
-	ARectWidth    float64
-	ARectHeight   float64
-	AExtWidth     float64
-	AExtHeight    float64
+	NotAnnotative bool       `conv:"derived"` // R2018+
+	AVersion      int16      `conv:"derived"`
+	ADefault      bool       `conv:"derived"`
+	ARegApp       Ref        `conv:"derived"`
+	AAttachment   int32      `conv:"derived"`
+	AXAxis        [3]float64 `conv:"derived"`
+	AInsertion    [3]float64 `conv:"derived"`
+	ARectWidth    float64    `conv:"derived"`
+	ARectHeight   float64    `conv:"derived"`
+	AExtWidth     float64    `conv:"derived"`
+	AExtHeight    float64    `conv:"derived"`
 	ColType       int16
 	ColHeights    []float64
 	ColCount      int32
@@ -163,11 +163,11 @@ func (b *Tolerance) handles(c *codec, o *Object) { c.H(&b.DimStyle) }
 
 // Leader §20.4.47.
 type Leader struct {
-	UnknownBit  bool
+	UnknownBit  bool `conv:"derived"`
 	AnnotType   int16
 	PathType    int16
 	Points      [][3]float64
-	Origin      [3]float64
+	Origin      [3]float64 `conv:"derived"` // not in DXF
 	Extrusion   [3]float64
 	XDir        [3]float64
 	OffsetBlock [3]float64
@@ -176,8 +176,8 @@ type Leader struct {
 	BoxWidth    float64
 	HookXDir    bool
 	ArrowheadOn bool
-	Unk1        int16
-	Unk2, Unk3  bool
+	Unk1        int16 `conv:"derived"`
+	Unk2, Unk3  bool  `conv:"derived"`
 	Annotation  Ref
 	DimStyle    Ref
 }

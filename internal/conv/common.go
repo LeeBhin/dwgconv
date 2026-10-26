@@ -96,6 +96,9 @@ func (x *ctx) entityCommon(m *dxf.Mapper, o *dwg.Object) {
 		case 2:
 			owner = x.ms
 		}
+		if b, ok := x.blockOwner[o.Handle]; ok && e.EntMode != 0 {
+			owner = b
+		}
 	}
 	x.ownership(m, o, &owner)
 	m.Subclass("AcDbEntity")
@@ -111,7 +114,12 @@ func (x *ctx) entityCommon(m *dxf.Mapper, o *dwg.Object) {
 	x.ltype(m, e)
 	x.color(m, e)
 	m.FloatDef(48, &e.LtypeScale, 1)
-	m.Int16Def(60, &e.Invisible, 0)
+	if !m.Reading() {
+		inv := e.Invisible & 1 // only bit 0 is the visibility (ODA writes nothing else)
+		m.Int16Def(60, &inv, 0)
+	} else {
+		m.Int16Def(60, &e.Invisible, 0)
+	}
 	lw := lineweightToDXF(e.Lineweight)
 	if !m.Reading() {
 		if e.Lineweight != 29 { // 29 is the canonical ByLayer and is omitted; 28 is written as -1
@@ -177,7 +185,7 @@ func (x *ctx) ltype(m *dxf.Mapper, e *dwg.EntityCommon) {
 		e.LtypeFlags = 2
 	default:
 		e.LtypeFlags = 3
-		e.Ltype = dwg.Ref{Code: 5, H: x.byName["LTYPE"][strings.ToUpper(s)]}
+		e.Ltype = dwg.Ref{Code: 5, H: x.byName["LTYPE"][nameKey(s)]}
 	}
 }
 
@@ -226,10 +234,24 @@ func (x *ctx) xdata(m *dxf.Mapper, o *dwg.Object) {
 			if !ok {
 				continue
 			}
-			w.Str(1001, x.names[e.App.H])
+			app := x.names[e.App.H]
+			if foldedApps[strings.ToUpper(app)] {
+				continue
+			}
+			if strings.EqualFold(app, "ACAD") {
+				gs = dropACADBlocks(gs)
+				if len(gs) == 0 {
+					continue
+				}
+			}
+			w.Str(1001, app)
 			for _, g := range gs {
 				if g.Code == 1005 && x.d.ByHandle[g.Handle()] == nil {
 					g.Value = "0" // dangling reference, as ODA writes it
+				}
+				if g.Code == 1000 {
+					w.Str(1000, g.Value) // \U+ escapes are converted like other strings
+					continue
 				}
 				w.Group(g)
 			}
@@ -245,9 +267,40 @@ func (x *ctx) xdata(m *dxf.Mapper, o *dwg.Object) {
 		for j < len(rest) && rest[j].Code > 1001 {
 			j++
 		}
-		app := x.byName["APPID"][strings.ToUpper(rest[i].Value)]
+		app := x.byName["APPID"][nameKey(rest[i].Value)]
 		o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app}, Data: groupsToEED(rest[i+1:j], r2007, x.d.Text)})
 		i = j - 1
 	}
 	m.Seek(m.Pos() + len(rest))
+}
+
+// foldedApps are xdata applications DXF does not carry as xdata: AcDbAttr is folded into
+// ATTRIB/ATTDEF group 280, AcDbSavedByObjectVersion is dropped (as ODA writes R2004 drawings).
+var foldedApps = map[string]bool{"ACDBATTR": true, "ACDBSAVEDBYOBJECTVERSION": true}
+
+// foldedACADBlocks are ACAD xdata blocks that DXF carries as MTEXT groups (46, 101 Embedded Object).
+var foldedACADBlocks = []string{"ACAD_MTEXT_DEFINED_HEIGHT", "ACAD_MTEXT_COLUMN_INFO"}
+
+// dropACADBlocks removes the folded NAME_BEGIN ... NAME_END blocks from ACAD xdata.
+func dropACADBlocks(gs []dxf.Group) []dxf.Group {
+	out := gs[:0:0]
+	for i := 0; i < len(gs); i++ {
+		g := gs[i]
+		folded := false
+		for _, n := range foldedACADBlocks {
+			if g.Code == 1000 && g.Value == n+"_BEGIN" {
+				for j := i + 1; j < len(gs); j++ {
+					if gs[j].Code == 1000 && gs[j].Value == n+"_END" {
+						i = j
+						folded = true
+						break
+					}
+				}
+			}
+		}
+		if !folded {
+			out = append(out, g)
+		}
+	}
+	return out
 }

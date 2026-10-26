@@ -131,8 +131,8 @@ type InsertCommon struct {
 	Extrusion  [3]float64
 	HasAttribs bool
 	BlockHdr   Ref
-	Attribs    []Ref // R2004+: owned ATTRIBs
-	SeqEnd     Ref
+	Attribs    []Ref `conv:"derived"` // R2004+: owned ATTRIBs (linked by the record sequence in DXF)
+	SeqEnd     Ref   `conv:"derived"`
 }
 
 func (b *InsertCommon) dataHead(c *codec) {

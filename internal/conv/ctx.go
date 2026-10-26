@@ -25,6 +25,8 @@ type ctx struct {
 	hdr    *dwg.Header
 	// measurement is $MEASUREMENT (stored in AcDb:Template, not the header).
 	measurement int16
+	// blockOwner maps entities (and BLOCK/ENDBLK) to the block record listing them.
+	blockOwner map[uint64]uint64
 	// auxVersion/auxMaint are the drawing format of the source (AcDb:AuxHeader), written in proxies.
 	auxVersion, auxMaint int
 }
@@ -42,7 +44,31 @@ func newCtx(d *dwg.Document) *ctx {
 	}
 	x.ms = x.byName["BLOCK_RECORD"]["*MODEL_SPACE"]
 	x.ps = x.byName["BLOCK_RECORD"]["*PAPER_SPACE"]
+	if d.File != nil {
+		if h, err := dwg.DecodeFileHeader(d.File); err == nil {
+			x.hdr = h
+			if r := h.Vars.BlockRecordModelSpace.H; r != 0 {
+				x.ms = r
+			}
+			if r := h.Vars.BlockRecordPaperSpace.H; r != 0 {
+				x.ps = r
+			}
+		}
+	}
 	x.numberBlockNames()
+	if x.ps != 0 {
+		x.byName["BLOCK_RECORD"]["*PAPER_SPACE"] = x.ps // several records share the name; the active one wins
+	}
+	x.blockOwner = map[uint64]uint64{}
+	for _, o := range d.Objects {
+		if bh, ok := o.Body.(*dwg.BlockHeader); ok {
+			x.blockOwner[bh.Block.H] = o.Handle
+			x.blockOwner[bh.EndBlk.H] = o.Handle
+			for _, e := range bh.Entities {
+				x.blockOwner[e.H] = o.Handle
+			}
+		}
+	}
 	// Proxy data format: the file's version code, and its maintenance byte (0x0B) or, when that is
 	// 0 (R2018 files), the AuxHeader maintenance version — as ODA writes groups 71/97.
 	x.auxVersion, x.auxMaint = 33, 0
@@ -63,8 +89,11 @@ func (x *ctx) addName(table, name string, h uint64) {
 	if x.byName[table] == nil {
 		x.byName[table] = map[string]uint64{}
 	}
-	x.byName[table][strings.ToUpper(name)] = h
+	x.byName[table][nameKey(name)] = h
 }
+
+// nameKey is the lookup key of a table record name: case-insensitive, \U+XXXX escapes resolved.
+func nameKey(name string) string { return strings.ToUpper(dxf.UnescapeU(name)) }
 
 // entryName reads the exported Name field of a table record body.
 func entryName(o *dwg.Object) (string, bool) {
@@ -94,14 +123,14 @@ func (x *ctx) NameRef(m *dxf.Mapper, code int, r *dwg.Ref, table string, refCode
 	if s == "" {
 		return
 	}
-	if h, ok := x.byName[table][strings.ToUpper(s)]; ok {
+	if h, ok := x.byName[table][nameKey(s)]; ok {
 		*r = dwg.Ref{Code: refCode, H: h}
 	}
 }
 
 // NameRefDef is NameRef where the record named def is implied when the group is absent (e.g. STANDARD).
 func (x *ctx) NameRefDef(m *dxf.Mapper, code int, r *dwg.Ref, table string, refCode byte, def string) {
-	dh := x.byName[table][strings.ToUpper(def)]
+	dh := x.byName[table][nameKey(def)]
 	if !m.Reading() {
 		if r.H == dh {
 			return
