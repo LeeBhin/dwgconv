@@ -1,6 +1,7 @@
 package conv
 
 import (
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -228,7 +229,7 @@ func (x *ctx) setHeaderField(f reflect.Value, e dwg.HeaderDXFVar, g []dxf.Group)
 	case dwg.JulianDate:
 		v := g[0].Float()
 		day := int32(v)
-		f.Set(reflect.ValueOf(dwg.JulianDate{Day: day, Ms: int32((v - float64(day)) * 86400000)}))
+		f.Set(reflect.ValueOf(dwg.JulianDate{Day: day, Ms: int32(math.Round((v - float64(day)) * 86400000))}))
 	case dwg.CmColor:
 		f.Set(reflect.ValueOf(dwg.ACIColor(int(g[0].Int()))))
 	case dwg.Ref:

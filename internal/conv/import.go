@@ -2,6 +2,7 @@ package conv
 
 import (
 	"encoding/binary"
+	"os"
 	"fmt"
 	"reflect"
 	"sort"
@@ -47,14 +48,25 @@ func FromDXF(f *dxf.File) ([]byte, error) {
 	x.ps = x.byName["BLOCK_RECORD"]["*PAPER_SPACE"]
 
 	var warn []string
+	skip := map[string]bool{}
+	for _, t := range strings.Split(os.Getenv("DWGCONV_SKIP"), ",") {
+		skip[t] = t != ""
+	}
 	add := func(r *dxf.Record, entity bool) *dwg.Object {
+		if skip[r.Type] { // diagnostics: leave record types out
+			return nil
+		}
 		o := x.importRecord(r, entity)
 		if o == nil {
 			warn = append(warn, r.Type)
 			return nil
 		}
-		if t, ok := x.classType(r.Type); ok {
-			o.Type = t
+		// types with a fixed number keep it (AutoCAD writes LAYOUT, LWPOLYLINE, XRECORD... that way);
+		// the class number is used only for class-only types
+		if o.Type == 0 {
+			if t, ok := x.classType(r.Type); ok {
+				o.Type = t
+			}
 		}
 		if o.Type == 0 {
 			warn = append(warn, r.Type+"(type)")
@@ -153,6 +165,17 @@ func FromDXF(f *dxf.File) ([]byte, error) {
 		}
 	}
 	x.finishBlockHeaders()
+	for _, o := range d.Objects {
+		if bh, ok := o.Body.(*dwg.BlockHeader); ok {
+			bh.InsertCounts = bh.InsertCounts[:0] // one non-zero byte per insert (as AutoCAD writes)
+			for range bh.Inserts {
+				bh.InsertCounts = append(bh.InsertCounts, 1)
+			}
+			if bh.Layout.H == 0 {
+				bh.Layout.Code = 5
+			}
+		}
+	}
 	x.finishHeaderRefs()
 
 	if len(warn) > 0 {
@@ -303,12 +326,20 @@ func (x *ctx) finishBlockHeaders() {
 			continue
 		}
 		if b := x.d.ByHandle[f.Interface().(dwg.Ref).H]; b != nil {
-			if bh, ok := b.Body.(*dwg.BlockHeader); ok {
+			if bh, ok := b.Body.(*dwg.BlockHeader); ok && !hasRef(bh.Inserts, o.Handle) {
 				bh.Inserts = append(bh.Inserts, dwg.Ref{Code: 4, H: o.Handle})
-				bh.InsertCounts = append(bh.InsertCounts, 1)
 			}
 		}
 	}
+}
+
+func hasRef(list []dwg.Ref, h uint64) bool {
+	for _, r := range list {
+		if r.H == h {
+			return true
+		}
+	}
+	return false
 }
 
 // finishHeaderRefs sets header references DXF does not carry directly.

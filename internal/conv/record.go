@@ -1,6 +1,8 @@
 package conv
 
 import (
+	"reflect"
+
 	"dwgconv/internal/dwg"
 	"dwgconv/internal/dxf"
 )
@@ -39,6 +41,12 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 		return nil
 	}
 	mp := mps[0]
+	for _, c := range mps { // prefer the fixed-type mapping when one exists
+		if c.dwgType != 0 && c.match == nil {
+			mp = c
+			break
+		}
+	}
 	for _, c := range mps {
 		if c.match != nil && c.match(r) {
 			mp = c
@@ -62,10 +70,48 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 	}
 	mp.fields(m, x, o, o.Body)
 	x.xdata(m, o)
+	// table records keep a null external-reference block handle as a hard pointer (code 5)
+	if f := reflect.ValueOf(o.Body).Elem().FieldByName("XrefBlock"); f.IsValid() {
+		if r := f.Interface().(dwg.Ref); r.H == 0 {
+			f.Set(reflect.ValueOf(dwg.Ref{Code: 5}))
+		}
+	}
+	// table records written by AutoCAD carry the "referenced" bit (64); DXF does not, so set it
+	if f := reflect.ValueOf(o.Body).Elem().FieldByName("Flag64"); f.IsValid() && f.Kind() == reflect.Bool {
+		f.SetBool(true)
+	}
+	fixNullRefs(reflect.ValueOf(o.Body))
 	if _, ok := o.Body.(*dwg.BlockHeader); ok {
 		if n, ok := entryName(o); ok {
 			setNameField(o, dwgBlockName(n)) // "*D12" is stored as "*D" in DWG
 		}
 	}
 	return o
+}
+
+// fixNullRefs gives null handle references a pointer code: AutoCAD never writes code 0 for a
+// handle field, and readers reject it ("object improperly read").
+func fixNullRefs(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !v.IsNil() {
+			fixNullRefs(v.Elem())
+		}
+	case reflect.Struct:
+		if v.Type() == reflect.TypeOf(dwg.Ref{}) {
+			if r := v.Interface().(dwg.Ref); r.H == 0 && r.Code == 0 && v.CanSet() {
+				v.Set(reflect.ValueOf(dwg.Ref{Code: 5}))
+			}
+			return
+		}
+		for i := 0; i < v.NumField(); i++ {
+			if v.Type().Field(i).IsExported() || v.Type().Field(i).Anonymous {
+				fixNullRefs(v.Field(i))
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			fixNullRefs(v.Index(i))
+		}
+	}
 }
