@@ -61,7 +61,9 @@ func init() {
 			for _, h := range b.Handles {
 				w.Handle(proxyHandleGroup(h.Code), h.H)
 			}
-			w.Int(94, 0)
+			if len(b.Handles) > 0 { // ODA ends the handle list with 94 only when there is one
+				w.Int(94, 0)
+			}
 			return
 		}
 		o.Type = int(cls)
