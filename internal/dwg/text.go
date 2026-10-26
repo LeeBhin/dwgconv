@@ -9,7 +9,11 @@ import (
 // TextCodec converts R2004 8-bit strings in the drawing codepage.
 type TextCodec struct {
 	enc encoding.Encoding
+	cp  int
 }
+
+// CodepageID is the DWG codepage number this codec was made for.
+func (t TextCodec) CodepageID() int { return t.cp }
 
 // codepages maps the DWG file header codepage number (offset 0x13) to its encoding and DXF name.
 // Only entries verified against real drawings are listed; others fall back to Windows-1252.
@@ -23,9 +27,9 @@ var codepages = map[int]struct {
 
 func textCodecFor(cp int) TextCodec {
 	if e, ok := codepages[cp]; ok {
-		return TextCodec{e.enc}
+		return TextCodec{e.enc, cp}
 	}
-	return TextCodec{charmap.Windows1252}
+	return TextCodec{charmap.Windows1252, cp}
 }
 
 // CodepageName returns the DXF $DWGCODEPAGE name for a header codepage number.
