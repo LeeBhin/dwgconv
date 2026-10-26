@@ -19,6 +19,10 @@ type mapping struct {
 	dwgType int
 	// name, when set, picks the DXF record name from the object (e.g. POLYLINE variants share a Go type).
 	name func(o *dwg.Object) string
+	// match, when set, selects this mapping on import among those sharing a DXF name.
+	match func(r *dxf.Record) bool
+	// handleCode is the group code of the record handle (5, or 105 for DIMSTYLE).
+	handleCode int
 }
 
 var (
@@ -31,11 +35,12 @@ func register[T dwg.Body](dxfName string, dwgType int, f func(m *dxf.Mapper, x *
 	var zero T
 	t := reflect.TypeOf(zero)
 	mp := &mapping{
-		dxfName: dxfName,
-		goType:  t,
-		dwgType: dwgType,
-		newBody: func() dwg.Body { return reflect.New(t.Elem()).Interface().(dwg.Body) },
-		fields:  func(m *dxf.Mapper, x *ctx, o *dwg.Object, b dwg.Body) { f(m, x, o, b.(T)) },
+		dxfName:    dxfName,
+		goType:     t,
+		dwgType:    dwgType,
+		handleCode: 5,
+		newBody:    func() dwg.Body { return reflect.New(t.Elem()).Interface().(dwg.Body) },
+		fields:     func(m *dxf.Mapper, x *ctx, o *dwg.Object, b dwg.Body) { f(m, x, o, b.(T)) },
 	}
 	byGoType[t] = mp
 	byDXFName[dxfName] = append(byDXFName[dxfName], mp)
