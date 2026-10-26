@@ -235,13 +235,9 @@ func (w *Writer) TV8(b []byte) {
 	w.Raw(b)
 }
 
-// TU writes BS character count then UTF-16LE. Non-empty strings get a terminating NUL counted in the length.
+// TU writes BS character count then UTF-16LE, without a terminator (as AutoCAD writes object strings).
 func (w *Writer) TU(s string) {
-	if s == "" {
-		w.BS(0)
-		return
-	}
-	u := append(utf16.Encode([]rune(s)), 0)
+	u := utf16.Encode([]rune(s))
 	w.BS(int16(len(u)))
 	for _, c := range u {
 		w.RS(int16(c))
