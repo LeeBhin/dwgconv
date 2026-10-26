@@ -14,7 +14,7 @@ func lineweightToDXF(i byte) int16 {
 	switch {
 	case int(i) < len(lineweights):
 		return lineweights[i]
-	case i == 29:
+	case i == 28 || i == 29: // ODA treats 28 as ByLayer as well
 		return -1
 	case i == 30:
 		return -2
@@ -110,10 +110,16 @@ func (x *ctx) entityCommon(m *dxf.Mapper, o *dwg.Object) {
 	x.NameRef(m, 8, &e.Layer, "LAYER", 5)
 	x.ltype(m, e)
 	x.color(m, e)
-	lw := lineweightToDXF(e.Lineweight)
-	m.Int16Def(370, &lw, -1)
 	m.FloatDef(48, &e.LtypeScale, 1)
 	m.Int16Def(60, &e.Invisible, 0)
+	lw := lineweightToDXF(e.Lineweight)
+	if !m.Reading() {
+		if e.Lineweight != 29 { // 29 is the canonical ByLayer and is omitted; 28 is written as -1
+			m.Int16(370, &lw)
+		}
+	} else {
+		m.Int16Def(370, &lw, -1)
+	}
 	if !m.Reading() {
 		if e.MatFlags == 3 {
 			x.HandleRef(m, 347, &e.Material, 5)
@@ -222,6 +228,9 @@ func (x *ctx) xdata(m *dxf.Mapper, o *dwg.Object) {
 			}
 			w.Str(1001, x.names[e.App.H])
 			for _, g := range gs {
+				if g.Code == 1005 && x.d.ByHandle[g.Handle()] == nil {
+					g.Value = "0" // dangling reference, as ODA writes it
+				}
 				w.Group(g)
 			}
 		}

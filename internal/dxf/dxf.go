@@ -129,6 +129,8 @@ func Parse(r io.Reader) (*File, error) {
 type Writer struct {
 	w   *bufio.Writer
 	err error
+	// UnescapeU converts \U+XXXX escapes (used by R2004 and earlier DWG strings) to the character.
+	UnescapeU bool
 }
 
 func NewWriter(w io.Writer) *Writer { return &Writer{w: bufio.NewWriterSize(w, 1<<20)} }
@@ -147,7 +149,31 @@ func (w *Writer) raw(code int, value string) {
 	_, w.err = fmt.Fprintf(w.w, "%3d\r\n%s\r\n", code, value)
 }
 
-func (w *Writer) Str(code int, s string) { w.raw(code, s) }
+func (w *Writer) Str(code int, s string) {
+	if w.UnescapeU {
+		s = UnescapeU(s)
+	}
+	w.raw(code, s)
+}
+
+// UnescapeU replaces \U+XXXX sequences with the Unicode character.
+func UnescapeU(s string) string {
+	if !strings.Contains(s, `\U+`) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if i+7 <= len(s) && s[i] == '\\' && s[i+1] == 'U' && s[i+2] == '+' {
+			if v, err := strconv.ParseUint(s[i+3:i+7], 16, 32); err == nil {
+				b.WriteRune(rune(v))
+				i += 6
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
 
 func (w *Writer) Int(code int, v int64) {
 	switch {
@@ -249,4 +275,3 @@ func DecodeBinary(s string) []byte {
 	}
 	return out
 }
-

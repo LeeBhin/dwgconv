@@ -79,6 +79,20 @@ func (x *ctx) NameRef(m *dxf.Mapper, code int, r *dwg.Ref, table string, refCode
 	}
 }
 
+// NameRefDef is NameRef where the record named def is implied when the group is absent (e.g. STANDARD).
+func (x *ctx) NameRefDef(m *dxf.Mapper, code int, r *dwg.Ref, table string, refCode byte, def string) {
+	dh := x.byName[table][strings.ToUpper(def)]
+	if !m.Reading() {
+		if r.H == dh {
+			return
+		}
+		x.NameRef(m, code, r, table, refCode)
+		return
+	}
+	*r = dwg.Ref{Code: refCode, H: dh}
+	x.NameRef(m, code, r, table, refCode)
+}
+
 // HandleRef binds a handle reference written as hex (330/340/350/360...).
 func (x *ctx) HandleRef(m *dxf.Mapper, code int, r *dwg.Ref, refCode byte) {
 	h := r.H

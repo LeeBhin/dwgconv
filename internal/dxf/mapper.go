@@ -1,6 +1,7 @@
 package dxf
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -15,14 +16,14 @@ type Mapper struct {
 	pos int
 }
 
-func NewWriteMapper(w *Writer) *Mapper   { return &Mapper{w: w} }
-func NewReadMapper(r *Record) *Mapper    { return &Mapper{rec: r} }
-func (m *Mapper) Reading() bool          { return m.w == nil }
-func (m *Mapper) Writer() *Writer        { return m.w }
-func (m *Mapper) Record() *Record        { return m.rec }
-func (m *Mapper) Rest() []Group          { return m.rec.Groups[m.pos:] }
-func (m *Mapper) Seek(pos int)           { m.pos = pos }
-func (m *Mapper) Pos() int               { return m.pos }
+func NewWriteMapper(w *Writer) *Mapper { return &Mapper{w: w} }
+func NewReadMapper(r *Record) *Mapper  { return &Mapper{rec: r} }
+func (m *Mapper) Reading() bool        { return m.w == nil }
+func (m *Mapper) Writer() *Writer      { return m.w }
+func (m *Mapper) Record() *Record      { return m.rec }
+func (m *Mapper) Rest() []Group        { return m.rec.Groups[m.pos:] }
+func (m *Mapper) Seek(pos int)         { m.pos = pos }
+func (m *Mapper) Pos() int             { return m.pos }
 
 // find returns the index of the next group with code, stopping at a subclass marker.
 func (m *Mapper) find(code int) int {
@@ -110,6 +111,37 @@ func (m *Mapper) FloatDef(code int, v *float64, def float64) {
 	if g, ok := m.take(code); ok {
 		*v = g.Float()
 	}
+}
+
+// AngleDef binds an angle stored in radians in DWG and degrees in DXF; omitted on write when equal to def.
+func (m *Mapper) AngleDef(code int, rad *float64, def float64) {
+	if !m.Reading() {
+		if *rad != def {
+			m.w.raw(code, FormatFloat(roundDeg(*rad*180/math.Pi)))
+		}
+		return
+	}
+	*rad = def
+	if g, ok := m.take(code); ok {
+		*rad = g.Float() * math.Pi / 180
+	}
+}
+
+// Angle binds a radian angle as DXF degrees, always written.
+func (m *Mapper) Angle(code int, rad *float64) {
+	if !m.Reading() {
+		m.w.raw(code, FormatFloat(roundDeg(*rad*180/math.Pi)))
+		return
+	}
+	if g, ok := m.take(code); ok {
+		*rad = g.Float() * math.Pi / 180
+	}
+}
+
+// roundDeg drops the last-bit noise of the radian to degree conversion (90.00000000000001 -> 90).
+func roundDeg(v float64) float64 {
+	r, _ := strconv.ParseFloat(strconv.FormatFloat(v, 'g', 15, 64), 64)
+	return r
 }
 
 func (m *Mapper) Int16(code int, v *int16) {

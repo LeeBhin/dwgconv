@@ -6,7 +6,7 @@ func init() {
 
 // Line §20.4.21.
 type Line struct {
-	ZZero      bool
+	ZZero      bool `conv:"derived"`
 	Start, End [3]float64
 	Thickness  float64
 	Extrusion  [3]float64
@@ -37,7 +37,7 @@ func init() {
 
 // TextCommon is the common TEXT entity data shared by TEXT, ATTRIB and ATTDEF (§20.4.3, R2000+ form).
 type TextCommon struct {
-	DataFlags  byte
+	DataFlags  byte `conv:"derived"`
 	Elevation  float64
 	Insertion  [2]float64
 	Alignment  [2]float64

@@ -59,6 +59,7 @@ func Check(d *dwg.Document, ref *dxf.File) map[string]*TypeCheck {
 		// export
 		var buf bytes.Buffer
 		w := dxf.NewWriter(&buf)
+		w.UnescapeU = !d.Version.R2007
 		x.exportRecord(w, o)
 		w.Flush()
 		ours := parseGroups(buf.String())
@@ -137,6 +138,9 @@ func objectDiff(want, got *dwg.Object) string {
 		ge.HasGraphic, ge.Graphic = we.HasGraphic, we.Graphic
 		ge.HasDS, ge.FullVS, ge.FaceVS, ge.EdgeVS = we.HasDS, we.FullVS, we.FaceVS, we.EdgeVS
 		ge.FullVSH, ge.FaceVSH, ge.EdgeVSH, ge.Shadow = we.FullVSH, we.FaceVSH, we.EdgeVSH, we.Shadow
+		if lineweightToDXF(ge.Lineweight) == lineweightToDXF(we.Lineweight) {
+			ge.Lineweight = we.Lineweight
+		}
 		if d := valueDiff("Ent", reflect.ValueOf(we), reflect.ValueOf(ge)); d != "" {
 			return d
 		}
@@ -176,7 +180,8 @@ func valueDiff(path string, a, b reflect.Value) string {
 	switch a.Kind() {
 	case reflect.Struct:
 		for i := 0; i < a.NumField(); i++ {
-			if !a.Type().Field(i).IsExported() {
+			// derived fields are recomputed from others on write; DXF does not carry them
+			if f := a.Type().Field(i); !f.IsExported() || f.Tag.Get("conv") == "derived" {
 				continue
 			}
 			if d := valueDiff(path+"."+a.Type().Field(i).Name, a.Field(i), b.Field(i)); d != "" {
@@ -196,6 +201,10 @@ func valueDiff(path string, a, b reflect.Value) string {
 		x, y := a.Float(), b.Float()
 		if x != y && math.Abs(x-y) > 1e-12*math.Max(1, math.Abs(x)) {
 			return fmt.Sprintf("%s: %v != %v", path, x, y)
+		}
+	case reflect.String:
+		if dxf.UnescapeU(a.String()) != dxf.UnescapeU(b.String()) {
+			return fmt.Sprintf("%s: %q != %q", path, a.String(), b.String())
 		}
 	default:
 		if a.CanInterface() && !reflect.DeepEqual(a.Interface(), b.Interface()) {

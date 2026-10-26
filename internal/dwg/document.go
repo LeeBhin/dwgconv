@@ -37,7 +37,7 @@ func isEntityType(t int, classes []Class) bool {
 	switch {
 	case t >= 1 && t <= 41:
 		return t != 9 // 9 is unused
-	case t == 44 || t == 45 || t == 46 || t == 47 || t == 0x4D || t == 0x4E || t == 0x1F2:
+	case t == 0x2B || t == 44 || t == 45 || t == 46 || t == 47 || t == 0x4A || t == 0x4D || t == 0x4E || t == 0x1F2:
 		return true
 	}
 	return false

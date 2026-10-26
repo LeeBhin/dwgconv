@@ -12,6 +12,9 @@ func init() {
 		m.Point3(10, &b.Start)
 		m.Point3(11, &b.End)
 		m.Extrusion(&b.Extrusion)
+		if m.Reading() {
+			b.ZZero = b.Start[2] == 0 && b.End[2] == 0
+		}
 	})
 	register("TEXT", 0x01, func(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Text) {
 		textFields(m, x, &b.TextCommon, "AcDbText")
@@ -32,10 +35,10 @@ func textFields(m *dxf.Mapper, x *ctx, t *dwg.TextCommon, subclass string) {
 	m.Point3(10, &ins)
 	m.Float(40, &t.Height)
 	m.Str(1, &t.Value)
-	m.FloatDef(50, &t.Rotation, 0)
+	m.AngleDef(50, &t.Rotation, 0)
 	m.FloatDef(41, &t.WidthFact, 1)
-	m.FloatDef(51, &t.Oblique, 0)
-	x.NameRef(m, 7, &t.Style, "STYLE", 5)
+	m.AngleDef(51, &t.Oblique, 0)
+	x.NameRefDef(m, 7, &t.Style, "STYLE", 5, "Standard")
 	m.Int16Def(71, &t.Generation, 0)
 	m.Int16Def(72, &t.HAlign, 0)
 	al := [3]float64{t.Alignment[0], t.Alignment[1], t.Elevation}
@@ -45,8 +48,6 @@ func textFields(m *dxf.Mapper, x *ctx, t *dwg.TextCommon, subclass string) {
 		}
 	} else if m.Has(11) {
 		m.Point3(11, &al)
-	} else {
-		al = ins
 	}
 	m.Extrusion(&t.Extrusion)
 	if m.Reading() {
