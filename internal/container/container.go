@@ -346,7 +346,7 @@ func (f *File) Write() []byte {
 	pmAddr := int64(len(out))
 	var page []byte
 	pmSize := int32(0)
-	for {
+	for iter := 0; ; iter++ {
 		buf := make([]byte, 0, 8*(len(pageMap)+1))
 		for _, e := range append(pageMap, [2]int32{pmID, pmSize}) {
 			buf = binary.LittleEndian.AppendUint32(buf, uint32(e[0]))
@@ -354,12 +354,18 @@ func (f *File) Write() []byte {
 		}
 		page = systemPage(pageTypePageMap, buf)
 		sz := int32(len(page) + (0x20-len(page)%0x20)%0x20)
-		if sz == pmSize {
-			break
+		if sz == pmSize || iter >= 4 && sz < pmSize {
+			break // a page extent may be larger than its data (§4.6); the rest is padded below
+		}
+		if iter >= 4 {
+			sz = max(sz, pmSize) // the compressed size can alternate between two values
 		}
 		pmSize = sz
 	}
 	out = pad(append(out, page...))
+	for int64(len(out)) < pmAddr+int64(pmSize) {
+		out = append(out, magic[:min(0x20, int(pmAddr+int64(pmSize))-len(out))]...)
+	}
 	secondHdr := int64(len(out))
 
 	copy(out[0:0x80], f.Prefix[:])
