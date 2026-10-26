@@ -61,3 +61,16 @@ func (t TextCodec) Encode(s string) []byte {
 	}
 	return append(b, 0)
 }
+
+// TextCodecFor returns the codec for a DWG codepage number.
+func TextCodecFor(cp int) TextCodec { return textCodecFor(cp) }
+
+// CodepageNumber returns the DWG codepage number for a DXF $DWGCODEPAGE name (30 = ANSI_1252 if unknown).
+func CodepageNumber(name string) int {
+	for n, e := range codepages {
+		if e.name == name {
+			return n
+		}
+	}
+	return 30
+}

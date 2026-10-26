@@ -13,6 +13,7 @@ import (
 
 	"dwgconv/internal/conv"
 	"dwgconv/internal/dwg"
+	"dwgconv/internal/dxf"
 )
 
 func main() {
@@ -28,6 +29,8 @@ func main() {
 		err = rewrite(in, out)
 	case from == ".dwg" && to == ".dxf":
 		err = dwgToDXF(in, out)
+	case from == ".dxf" && to == ".dwg":
+		err = dxfToDWG(in, out)
 	default:
 		err = fmt.Errorf("unsupported conversion %s -> %s", from, to)
 	}
@@ -51,6 +54,26 @@ func dwgToDXF(in, out string) error {
 		return err
 	}
 	return f.Close()
+}
+
+func dxfToDWG(in, out string) error {
+	fh, err := os.Open(in)
+	if err != nil {
+		return err
+	}
+	f, err := dxf.Parse(fh)
+	fh.Close()
+	if err != nil {
+		return err
+	}
+	data, err := conv.FromDXF(f)
+	if err != nil {
+		return err
+	}
+	if w := conv.Warnings(); len(w) > 0 {
+		fmt.Fprintln(os.Stderr, "skipped (no mapping):", strings.Join(w, ", "))
+	}
+	return os.WriteFile(out, data, 0o644)
 }
 
 func rewrite(in, out string) error {

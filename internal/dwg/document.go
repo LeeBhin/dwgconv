@@ -210,3 +210,21 @@ func (d *Document) EncodeObjects() (objects, handles []byte) {
 	}
 	return objects, encodeObjectMap(m)
 }
+
+// NewDocument returns an empty document for building a drawing from scratch.
+func NewDocument(version string, codepage int) *Document {
+	return &Document{
+		Version:   versionOf(version),
+		Codepage:  codepage,
+		Text:      textCodecFor(codepage),
+		Classes:   DefaultClasses(),
+		ByHandle:  map[uint64]*Object{},
+		objPrefix: []byte{0xCA, 0x0D, 0, 0}, // RL 0x0dca at the start of AcDb:AcDbObjects (§20)
+	}
+}
+
+// Add appends an object to the document.
+func (d *Document) Add(o *Object) {
+	d.Objects = append(d.Objects, o)
+	d.ByHandle[o.Handle] = o
+}

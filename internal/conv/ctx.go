@@ -22,6 +22,8 @@ type ctx struct {
 	byName map[string]map[string]uint64 // DXF table -> upper(name) -> handle
 	ms, ps uint64                       // *Model_Space / *Paper_Space block records
 	hdr    *dwg.Header
+	// measurement is $MEASUREMENT (stored in AcDb:Template, not the header).
+	measurement int16
 }
 
 func newCtx(d *dwg.Document) *ctx {
