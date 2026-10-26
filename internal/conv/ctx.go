@@ -12,6 +12,7 @@ import (
 var tableOf = map[string]string{
 	"LAYER": "LAYER", "LTYPE": "LTYPE", "STYLE": "STYLE", "DIMSTYLE": "DIMSTYLE", "APPID": "APPID",
 	"VIEW": "VIEW", "UCS": "UCS", "VPORT": "VPORT", "BLOCK_HEADER": "BLOCK_RECORD",
+	"MLINESTYLE": "MLINESTYLE",
 }
 
 // ctx holds the lookups shared by export and import.
@@ -20,6 +21,7 @@ type ctx struct {
 	names  map[uint64]string            // table record handle -> name
 	byName map[string]map[string]uint64 // DXF table -> upper(name) -> handle
 	ms, ps uint64                       // *Model_Space / *Paper_Space block records
+	hdr    *dwg.Header
 }
 
 func newCtx(d *dwg.Document) *ctx {
