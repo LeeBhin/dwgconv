@@ -268,11 +268,13 @@ func (x *ctx) xdata(m *dxf.Mapper, o *dwg.Object) {
 			continue
 		}
 		j := i + 1
-		for j < len(rest) && rest[j].Code > 1001 {
+		for j < len(rest) && rest[j].Code >= 1000 && rest[j].Code != 1001 {
 			j++
 		}
 		app := x.byName["APPID"][nameKey(rest[i].Value)]
-		o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app}, Data: groupsToEED(rest[i+1:j], r2007, x.d.Text)})
+		if data := groupsToEED(rest[i+1:j], r2007, x.d.Text); len(data) > 0 { // size 0 would end the EED list
+			o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app}, Data: data})
+		}
 		i = j - 1
 	}
 	m.Seek(m.Pos() + len(rest))
@@ -309,45 +311,8 @@ func dropACADBlocks(gs []dxf.Group) []dxf.Group {
 	return out
 }
 
-// consumedXRecord reports xdictionary entries ODA does not write to DXF (it folds or regenerates them).
-func (x *ctx) consumedXRecord(name string) bool {
-	switch name {
-	case "ACAD_LAYOUTSELFREF", "ACAD_MTEXT_2008_RT":
-		return true
-	case "ACAD_XREC_ROUNDTRIP":
-		return !x.d.Version.R2007
-	}
-	return false
-}
-
-// xdicOmitted reports whether an object's extension dictionary is left out of the DXF: when it
-// holds only consumed entries, or (R2004 input) when it is empty — as ODA writes it.
+// xdicOmitted reports whether an object's extension dictionary is left out of the DXF
+// (ODA's omission rules, see eODAOmits).
 func (x *ctx) xdicOmitted(o *dwg.Object) bool {
-	if o.XDicMiss || o.XDic.H == 0 {
-		return false
-	}
-	do := x.d.ByHandle[o.XDic.H]
-	if do == nil {
-		return true
-	}
-	dict, ok := do.Body.(*dwg.Dictionary)
-	if !ok {
-		return false
-	}
-	consumed := 0
-	for _, n := range dict.Names {
-		if x.consumedXRecord(n) {
-			consumed++
-		}
-	}
-	if consumed < len(dict.Names) {
-		return false
-	}
-	return consumed > 0 || !x.d.Version.R2007 || !keepsEmptyXDic(o)
-}
-
-// keepsEmptyXDic: ODA keeps an empty extension dictionary only on table control objects (R2010+).
-func keepsEmptyXDic(o *dwg.Object) bool {
-	_, ok := o.Body.(*dwg.TableControl)
-	return ok
+	return !o.XDicMiss && o.XDic.H != 0 && eODAOmits(x, o.XDic.H)
 }

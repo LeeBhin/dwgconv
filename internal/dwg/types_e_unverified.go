@@ -6,6 +6,7 @@ func init() {
 	bodyFactory[0x48] = func() Body { return &Group{} }
 	classBodyFactory["GROUP"] = func() Body { return &Group{} }
 	classBodyFactory["IMAGEDEFREACTOR"] = func() Body { return &ImageDefReactor{} }
+	classBodyFactory["IMAGEDEF_REACTOR"] = func() Body { return &ImageDefReactor{} } // class DXF name
 	classBodyFactory["RASTERVARIABLES"] = func() Body { return &RasterVariables{} }
 	classBodyFactory["SPATIAL_FILTER"] = func() Body { return &SpatialFilter{} }
 	classBodyFactory["FIELD"] = func() Body { return &Field{} }

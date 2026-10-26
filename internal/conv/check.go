@@ -74,7 +74,7 @@ func Check(d *dwg.Document, ref *dxf.File) map[string]*TypeCheck {
 		if got == nil {
 			continue
 		}
-		if d := objectDiff(o, got, x.xdicOmitted(o)); d == "" {
+		if d := x.objectDiff(o, got, x.xdicOmitted(o)); d == "" {
 			tc.ImportEqual++
 		} else if tc.ImportDiff == "" {
 			tc.ImportDiff = fmt.Sprintf("%X: %s", o.Handle, d)
@@ -131,7 +131,7 @@ func groupsDiff(a, b []dxf.Group) string {
 }
 
 // objectDiff compares the DXF-representable parts of two objects and names the first difference.
-func objectDiff(want, got *dwg.Object, xdicOmitted bool) string {
+func (x *ctx) objectDiff(want, got *dwg.Object, xdicOmitted bool) string {
 	if want.IsEntity {
 		we, ge := *want.Ent, *got.Ent
 		// fields DXF cannot carry
@@ -157,8 +157,8 @@ func objectDiff(want, got *dwg.Object, xdicOmitted bool) string {
 	if !xdicOmitted && (want.XDicMiss != got.XDicMiss || want.XDic.H != got.XDic.H) {
 		return "XDic"
 	}
-	if len(want.EED) != len(got.EED) {
-		return fmt.Sprintf("EED count %d != %d", len(want.EED), len(got.EED))
+	if d := x.eedDiff(want, got); d != "" {
+		return d
 	}
 	return valueDiff("Body", reflect.ValueOf(want.Body), reflect.ValueOf(got.Body))
 }
@@ -212,6 +212,46 @@ func valueDiff(path string, a, b reflect.Value) string {
 	default:
 		if a.CanInterface() && !reflect.DeepEqual(a.Interface(), b.Interface()) {
 			return fmt.Sprintf("%s: %v != %v", path, a.Interface(), b.Interface())
+		}
+	}
+	return ""
+}
+
+// eedDiff compares extended data as DXF groups, the way DXF carries it: folded applications
+// left out, \U+ escapes resolved, dangling 1005 references as 0.
+func (x *ctx) eedDiff(want, got *dwg.Object) string {
+	norm := func(o *dwg.Object) []string {
+		var out []string
+		for _, e := range o.EED {
+			app := x.names[e.App.H]
+			if foldedApps[strings.ToUpper(app)] {
+				continue
+			}
+			gs, _ := eedToGroups(e.Data, x.d.Version.R2007, x.d.Text)
+			if _, mtext := o.Body.(*dwg.MText); mtext && strings.EqualFold(app, "ACAD") {
+				gs = dropACADBlocks(gs)
+			}
+			if len(gs) == 0 {
+				continue
+			}
+			out = append(out, "1001="+strings.ToUpper(app))
+			for _, g := range gs {
+				v := dxf.UnescapeU(g.Value)
+				if g.Code == 1005 && x.d.ByHandle[g.Handle()] == nil {
+					v = "0"
+				}
+				out = append(out, fmt.Sprintf("%d=%s", g.Code, strings.TrimSpace(v)))
+			}
+		}
+		return out
+	}
+	a, b := norm(want), norm(got)
+	if len(a) != len(b) {
+		return fmt.Sprintf("EED groups %d != %d", len(a), len(b))
+	}
+	for i := range a {
+		if a[i] != b[i] && !valuesEqual(a[i][strings.Index(a[i], "=")+1:], b[i][strings.Index(b[i], "=")+1:]) {
+			return fmt.Sprintf("EED %s != %s", a[i], b[i])
 		}
 	}
 	return ""

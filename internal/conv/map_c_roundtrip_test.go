@@ -62,7 +62,7 @@ func TestCMappingsRoundTrip(t *testing.T) {
 			if got == nil {
 				t.Fatalf("%T: import failed", o.Body)
 			}
-			if diff := objectDiff(o, got, false); diff != "" {
+			if diff := newCtx(d).objectDiff(o, got, false); diff != "" {
 				t.Errorf("%+v %T: %s", v, o.Body, diff)
 			}
 		}

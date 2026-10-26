@@ -195,7 +195,7 @@ func (x *ctx) exportObjects(w *dxf.Writer) {
 	var visit func(h uint64)
 	visit = func(h uint64) {
 		o := x.d.ByHandle[h]
-		if o == nil || done[h] || !isObjectsSectionObject(x, o) {
+		if o == nil || done[h] || !isObjectsSectionObject(x, o) || eODAOmits(x, h) {
 			return
 		}
 		done[h] = true
@@ -204,18 +204,9 @@ func (x *ctx) exportObjects(w *dxf.Writer) {
 			visit(o.XDic.H)
 		}
 		if dict, ok := o.Body.(*dwg.Dictionary); ok {
-			for i, it := range dict.Items {
-				if i < len(dict.Names) && x.consumedXRecord(dict.Names[i]) {
-					done[it.H] = true
-					continue
-				}
+			for _, it := range dict.Items {
 				visit(it.H)
 			}
-		}
-	}
-	for _, o := range x.d.Objects {
-		if x.xdicOmitted(o) {
-			done[o.XDic.H] = true
 		}
 	}
 	visit(x.hdr.Vars.DictNamedObjects.H)

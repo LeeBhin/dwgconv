@@ -111,12 +111,12 @@ type Layout struct {
 	OrthoViewType int16
 	ExtMin        [3]float64
 	ExtMax        [3]float64
-	VisualStyle   Ref
+	VisualStyle   Ref `conv:"derived"` // not in DXF
 	BlockRecord   Ref
 	LastViewport  Ref
 	BaseUCS       Ref
 	NamedUCS      Ref
-	Viewports     []Ref
+	Viewports     []Ref `conv:"derived"` // not in DXF: rebuilt from the layout block's viewports
 }
 
 func (b *Layout) data(c *codec, o *Object) {

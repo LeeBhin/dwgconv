@@ -75,6 +75,9 @@ func FromDXF(f *dxf.File) ([]byte, error) {
 				table, _ = r.Value(2)
 				ctl = add(r, false)
 				if ctl != nil {
+					if tc, ok := ctl.Body.(*dwg.TableControl); ok {
+						tc.SetKind(ctl.Type) // which control (decides the special entries)
+					}
 					if fld, ok := controlField[table]; ok {
 						hv.FieldByName(fld).Set(reflect.ValueOf(dwg.Ref{Code: 3, H: ctl.Handle}))
 					}
@@ -94,11 +97,17 @@ func FromDXF(f *dxf.File) ([]byte, error) {
 				if table == "BLOCK_RECORD" {
 					setNameField(o, dwgBlockName(name))
 				}
+				// special records: *MODEL_SPACE, *PAPER_SPACE and BYLAYER, BYBLOCK, in that order (§20.4.51, §20.4.57)
+				slot := -1
+				switch strings.ToUpper(name) {
+				case "*MODEL_SPACE", "BYLAYER":
+					slot = 0
+				case "*PAPER_SPACE", "BYBLOCK":
+					slot = 1
+				}
 				switch {
-				case table == "BLOCK_RECORD" && isSpaceBlock(name):
-					tc.Special = append(tc.Special, dwg.Ref{Code: 3, H: o.Handle})
-				case table == "LTYPE" && (strings.EqualFold(name, "ByLayer") || strings.EqualFold(name, "ByBlock")):
-					tc.Special = append(tc.Special, dwg.Ref{Code: 3, H: o.Handle})
+				case slot >= 0 && slot < len(tc.Special) && tc.Special[slot].H == 0:
+					tc.Special[slot] = dwg.Ref{Code: 3, H: o.Handle}
 				default:
 					tc.Entries = append(tc.Entries, dwg.Ref{Code: 2, H: o.Handle})
 				}
@@ -166,11 +175,6 @@ var lastWarnings []string
 
 // Warnings returns the record types skipped by the last FromDXF call.
 func Warnings() []string { return lastWarnings }
-
-func isSpaceBlock(name string) bool {
-	n := strings.ToUpper(name)
-	return n == "*MODEL_SPACE" || n == "*PAPER_SPACE"
-}
 
 func headerString(f *dxf.File, name string) string {
 	if s := f.Section("HEADER"); s != nil {

@@ -52,7 +52,7 @@ type MLeaderStyle struct {
 	TopAttachment    int16 // R2010+
 	BottomAttachment int16 // R2010+
 	UnknownBool      bool  // R2010+, undocumented trailing bit
-	NewFormat        bool  // R2010+ or ACAD_MLEADERVER EED present (R2004)
+	NewFormat        bool  `conv:"derived"` // R2010+ or ACAD_MLEADERVER EED present (R2004)
 }
 
 func (b *MLeaderStyle) data(c *codec, o *Object) {
@@ -99,8 +99,10 @@ func (b *MLeaderStyle) data(c *codec, o *Object) {
 	c.B(&b.BlockRotationOn)
 	c.BS(&b.BlockConnection)
 	c.BD(&b.ScaleFactor)
-	c.B(&b.PropertyChanged)
+	// The spec lists "property changed" then "is annotative"; the data (checked against ODA's
+	// DXF 295/296) has them the other way round.
 	c.B(&b.Annotative)
+	c.B(&b.PropertyChanged)
 	c.BD(&b.BreakSize)
 	if c.R2010 {
 		c.BS(&b.AttachDirection)
