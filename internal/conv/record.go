@@ -62,5 +62,10 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 	}
 	mp.fields(m, x, o, o.Body)
 	x.xdata(m, o)
+	if _, ok := o.Body.(*dwg.BlockHeader); ok {
+		if n, ok := entryName(o); ok {
+			setNameField(o, dwgBlockName(n)) // "*D12" is stored as "*D" in DWG
+		}
+	}
 	return o
 }

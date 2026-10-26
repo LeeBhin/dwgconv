@@ -204,9 +204,18 @@ func (x *ctx) exportObjects(w *dxf.Writer) {
 			visit(o.XDic.H)
 		}
 		if dict, ok := o.Body.(*dwg.Dictionary); ok {
-			for _, it := range dict.Items {
+			for i, it := range dict.Items {
+				if i < len(dict.Names) && x.consumedXRecord(dict.Names[i]) {
+					done[it.H] = true
+					continue
+				}
 				visit(it.H)
 			}
+		}
+	}
+	for _, o := range x.d.Objects {
+		if x.xdicOmitted(o) {
+			done[o.XDic.H] = true
 		}
 	}
 	visit(x.hdr.Vars.DictNamedObjects.H)

@@ -74,7 +74,7 @@ func Check(d *dwg.Document, ref *dxf.File) map[string]*TypeCheck {
 		if got == nil {
 			continue
 		}
-		if d := objectDiff(o, got); d == "" {
+		if d := objectDiff(o, got, x.xdicOmitted(o)); d == "" {
 			tc.ImportEqual++
 		} else if tc.ImportDiff == "" {
 			tc.ImportDiff = fmt.Sprintf("%X: %s", o.Handle, d)
@@ -131,13 +131,16 @@ func groupsDiff(a, b []dxf.Group) string {
 }
 
 // objectDiff compares the DXF-representable parts of two objects and names the first difference.
-func objectDiff(want, got *dwg.Object) string {
+func objectDiff(want, got *dwg.Object, xdicOmitted bool) string {
 	if want.IsEntity {
 		we, ge := *want.Ent, *got.Ent
 		// fields DXF cannot carry
 		ge.HasGraphic, ge.Graphic = we.HasGraphic, we.Graphic
 		ge.HasDS, ge.FullVS, ge.FaceVS, ge.EdgeVS = we.HasDS, we.FullVS, we.FaceVS, we.EdgeVS
 		ge.FullVSH, ge.FaceVSH, ge.EdgeVSH, ge.Shadow = we.FullVSH, we.FaceVSH, we.EdgeVSH, we.Shadow
+		if ge.Invisible&1 == we.Invisible&1 {
+			ge.Invisible = we.Invisible
+		}
 		if lineweightToDXF(ge.Lineweight) == lineweightToDXF(we.Lineweight) {
 			ge.Lineweight = we.Lineweight
 		}
@@ -151,7 +154,7 @@ func objectDiff(want, got *dwg.Object) string {
 	if len(want.Reactors) != len(got.Reactors) {
 		return fmt.Sprintf("Reactors %d != %d", len(want.Reactors), len(got.Reactors))
 	}
-	if want.XDicMiss != got.XDicMiss || want.XDic.H != got.XDic.H {
+	if !xdicOmitted && (want.XDicMiss != got.XDicMiss || want.XDic.H != got.XDic.H) {
 		return "XDic"
 	}
 	if len(want.EED) != len(got.EED) {
