@@ -229,7 +229,11 @@ func (x *ctx) xdata(m *dxf.Mapper, o *dwg.Object) {
 	r2007 := x.d.Version.R2007
 	if !m.Reading() {
 		w := m.Writer()
+		mp := mappingFor(o)
 		for _, e := range o.EED {
+			if mp != nil && mp.skipEED != nil && mp.skipEED(x, o, e) {
+				continue
+			}
 			gs, ok := eedToGroups(e.Data, r2007, x.d.Text)
 			if !ok {
 				continue

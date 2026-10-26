@@ -23,6 +23,10 @@ type mapping struct {
 	match func(r *dxf.Record) bool
 	// handleCode is the group code of the record handle (5, or 105 for DIMSTYLE).
 	handleCode int
+	// preHandle, when set, binds groups that precede the handle (TABLE's 2 name).
+	preHandle func(m *dxf.Mapper, x *ctx, o *dwg.Object)
+	// skipEED, when set, drops EED blocks from xdata that the fields write as groups.
+	skipEED func(x *ctx, o *dwg.Object, e dwg.EED) bool
 }
 
 var (

@@ -16,8 +16,11 @@ func (x *ctx) exportRecord(w *dxf.Writer, o *dwg.Object) bool {
 		name = mp.name(o)
 	}
 	w.Str(0, name)
-	w.Handle(mp.handleCode, o.Handle)
 	m := dxf.NewWriteMapper(w)
+	if mp.preHandle != nil {
+		mp.preHandle(m, x, o)
+	}
+	w.Handle(mp.handleCode, o.Handle)
 	if o.IsEntity {
 		x.entityCommon(m, o)
 	} else {
@@ -44,6 +47,9 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 	}
 	o := &dwg.Object{Handle: r.Handle(mp.handleCode), IsEntity: entity, Body: mp.newBody(), Type: mp.dwgType}
 	m := dxf.NewReadMapper(r)
+	if mp.preHandle != nil {
+		mp.preHandle(m, x, o)
+	}
 	var h uint64
 	m.Handle(mp.handleCode, &h)
 	if entity {
