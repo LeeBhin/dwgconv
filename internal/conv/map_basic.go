@@ -43,7 +43,8 @@ func textFields(m *dxf.Mapper, x *ctx, t *dwg.TextCommon, subclass string) {
 	m.Int16Def(72, &t.HAlign, 0)
 	al := [3]float64{t.Alignment[0], t.Alignment[1], t.Elevation}
 	if !m.Reading() {
-		if t.DataFlags&0x02 == 0 {
+		// written when stored, and whenever the text is aligned (ODA writes 0,0 then)
+		if t.DataFlags&0x02 == 0 || t.HAlign != 0 || t.VAlign != 0 {
 			m.Point3(11, &al)
 		}
 	} else if m.Has(11) {

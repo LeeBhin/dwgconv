@@ -228,3 +228,6 @@ func (d *Document) Add(o *Object) {
 	d.Objects = append(d.Objects, o)
 	d.ByHandle[o.Handle] = o
 }
+
+// VersionCode is the numeric DWG version (§27): 25 R2004, 27 R2007, 29 R2010, 31 R2013, 33 R2018.
+func VersionCode(version string) int { return int(auxVersionCodes[version]) }

@@ -2,7 +2,7 @@ package dwg
 
 func init() {
 	classBodyFactory["IMAGE"] = func() Body { return &Image{} }
-	classBodyFactory["WIPEOUT"] = func() Body { return &Image{} }
+	classBodyFactory["WIPEOUT"] = func() Body { return &Wipeout{} }
 }
 
 // Image is IMAGE (§20.4.80); WIPEOUT uses the same layout. Unverified: no samples contain these.
@@ -58,3 +58,6 @@ func (b *Image) handles(c *codec, o *Object) {
 	c.H(&b.ImageDef)
 	c.H(&b.ImageDefReactor)
 }
+
+// Wipeout is WIPEOUT: the IMAGE layout under its own type so it maps to its own DXF record.
+type Wipeout struct{ Image }

@@ -1,6 +1,7 @@
 package conv
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -24,6 +25,8 @@ type ctx struct {
 	hdr    *dwg.Header
 	// measurement is $MEASUREMENT (stored in AcDb:Template, not the header).
 	measurement int16
+	// auxVersion/auxMaint are the drawing format of the source (AcDb:AuxHeader), written in proxies.
+	auxVersion, auxMaint int
 }
 
 func newCtx(d *dwg.Document) *ctx {
@@ -39,6 +42,19 @@ func newCtx(d *dwg.Document) *ctx {
 	}
 	x.ms = x.byName["BLOCK_RECORD"]["*MODEL_SPACE"]
 	x.ps = x.byName["BLOCK_RECORD"]["*PAPER_SPACE"]
+	x.numberBlockNames()
+	// Proxy data format: the file's version code, and its maintenance byte (0x0B) or, when that is
+	// 0 (R2018 files), the AuxHeader maintenance version — as ODA writes groups 71/97.
+	x.auxVersion, x.auxMaint = 33, 0
+	if d.File != nil {
+		x.auxVersion = dwg.VersionCode(d.File.Version)
+		x.auxMaint = int(d.File.Prefix[0x0B])
+		if s := d.File.Section("AcDb:AuxHeader"); s != nil && x.auxMaint == 0 {
+			if a, err := dwg.DecodeAuxHeader(s.Data, d.Version); err == nil {
+				x.auxMaint = int(a.Maint)
+			}
+		}
+	}
 	return x
 }
 
@@ -112,4 +128,71 @@ func (x *ctx) HandleRefOpt(m *dxf.Mapper, code int, r *dwg.Ref, refCode byte) {
 		return
 	}
 	x.HandleRef(m, code, r, refCode)
+}
+
+// numberBlockNames gives anonymous blocks and extra paper spaces the numbered names DXF uses:
+// DWG stores "*D", "*X", "*U"... and repeated "*Paper_Space"; the DXF name appends the position in
+// the block table minus 2 for anonymous blocks, and 0, 1, ... for the extra paper spaces (as ODA).
+func (x *ctx) numberBlockNames() {
+	var ctl *dwg.Object
+	for _, o := range x.d.Objects {
+		if o.Type == 0x30 {
+			ctl = o
+			break
+		}
+	}
+	if ctl == nil {
+		return
+	}
+	paper := 0
+	for i, r := range controlEntries(ctl) {
+		name, ok := x.names[r.H]
+		if !ok {
+			continue
+		}
+		up := strings.ToUpper(name)
+		switch {
+		case up == "*PAPER_SPACE":
+			if paper > 0 {
+				x.addName("BLOCK_RECORD", fmt.Sprintf("%s%d", name, paper-1), r.H)
+			}
+			paper++
+		case isAnonymousBase(name):
+			x.addName("BLOCK_RECORD", fmt.Sprintf("%s%d", name, i-2), r.H)
+		}
+	}
+}
+
+// isAnonymousBase reports names like "*D", "*X", "*U": '*' followed only by letters, other than the spaces.
+func isAnonymousBase(name string) bool {
+	if len(name) < 2 || name[0] != '*' {
+		return false
+	}
+	for _, c := range name[1:] {
+		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z') {
+			return false
+		}
+	}
+	up := strings.ToUpper(name)
+	return up != "*MODEL_SPACE" && up != "*PAPER_SPACE"
+}
+
+// dwgBlockName is the name a block record is stored under in DWG: numbered anonymous and paper
+// space names lose their number ("*D12" -> "*D", "*Paper_Space0" -> "*Paper_Space").
+func dwgBlockName(name string) string {
+	if len(name) < 2 || name[0] != '*' {
+		return name
+	}
+	end := len(name)
+	for end > 1 && name[end-1] >= '0' && name[end-1] <= '9' {
+		end--
+	}
+	if end == len(name) {
+		return name
+	}
+	base := name[:end]
+	if isAnonymousBase(base) || strings.EqualFold(base, "*Paper_Space") {
+		return base
+	}
+	return name
 }

@@ -18,7 +18,7 @@ type DimCommon struct {
 	Extrusion     [3]float64
 	TextMidpt     [2]float64 // 11
 	Elevation     float64
-	Flags1        byte
+	Flags1        byte   `conv:"derived"` // bits 0/1 follow DXF 70; bit 3 is not carried
 	UserText      string // 1
 	TextRot       float64
 	HorizDir      float64 // 51

@@ -91,6 +91,9 @@ func FromDXF(f *dxf.File) ([]byte, error) {
 					continue
 				}
 				name, _ := r.Value(2)
+				if table == "BLOCK_RECORD" {
+					setNameField(o, dwgBlockName(name))
+				}
 				switch {
 				case table == "BLOCK_RECORD" && isSpaceBlock(name):
 					tc.Special = append(tc.Special, dwg.Ref{Code: 3, H: o.Handle})
@@ -257,6 +260,9 @@ func (x *ctx) attachEntity(o *dwg.Object, typ string) {
 		switch typ {
 		case "BLOCK":
 			bh.Block = dwg.Ref{Code: 3, H: o.Handle}
+			if n, ok := entryName(o); ok {
+				setNameField(o, dwgBlockName(n))
+			}
 		case "ENDBLK":
 			bh.EndBlk = dwg.Ref{Code: 3, H: o.Handle}
 		default:
@@ -394,4 +400,14 @@ func julianNow() dwg.JulianDate {
 	jd := float64(t.UnixMilli())/86400000 + unixEpochJD
 	day := int32(jd)
 	return dwg.JulianDate{Day: day, Ms: int32((jd - float64(day)) * 86400000)}
+}
+
+// setNameField sets the exported Name field of a body, if it has one.
+func setNameField(o *dwg.Object, name string) {
+	if o.Body == nil {
+		return
+	}
+	if f := reflect.ValueOf(o.Body).Elem().FieldByName("Name"); f.IsValid() && f.Kind() == reflect.String {
+		f.SetString(name)
+	}
 }

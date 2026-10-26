@@ -139,7 +139,7 @@ type Acis struct {
 	Empty           bool
 	Unknown         bool
 	Version         int16
-	Data            AcisData
+	Data            AcisData `conv:"derived"` // DXF carries the decoded SAT text, not the block split
 	Wireframe       bool
 	PointPresent    bool
 	Point           [3]float64
@@ -206,8 +206,8 @@ type ProxyEntity struct {
 	OrigDXF      bool  // 70
 	DataBits     []byte
 	NDataBits    int
-	StrBits      []byte
-	NStrBits     int
+	StrBits      []byte `conv:"derived"` // R2007+ string stream bits; not in DXF
+	NStrBits     int    `conv:"derived"`
 	Handles      []Ref
 }
 

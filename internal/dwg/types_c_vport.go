@@ -109,8 +109,8 @@ func (b *ViewportEnt) handles(c *codec, o *Object) {
 
 // Ole2Frame §20.4.88.
 type Ole2Frame struct {
-	Flags   int16 // 70
-	Mode    int16
+	Flags   int16  // 70
+	Mode    int16  `conv:"derived"` // not in DXF (72 there is the tile mode)
 	Data    []byte // OLE2 data (310)
 	Unknown byte
 }
