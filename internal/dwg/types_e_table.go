@@ -144,14 +144,14 @@ type TableStyle struct {
 	Rows           [3]TableStyleRow // data, title, header
 	// R24
 	Unknown1     byte
-	Unknown2     int32
+	Unknown2     int32 `conv:"derived"` // not in DXF (0, 3, 8 seen)
 	Unknown3     int32
 	UnknownOwner Ref
 	TableCell    CellStyle
 	CellStyles   []CellStyle
 	// LeadIDs: in TABLESTYLE each custom cell style is preceded by a BL repeating its ID
 	// (not in the spec; observed in R2013/R2018 files).
-	LeadIDs []int32
+	LeadIDs []int32 `conv:"derived"`
 }
 
 func (b *TableStyle) data(c *codec, o *Object) {

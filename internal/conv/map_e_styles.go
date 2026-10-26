@@ -1,6 +1,7 @@
 package conv
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -183,7 +184,75 @@ func init() {
 				eCMC(m, 64+k, &bd.Color)
 			}
 		}
+		if m.Reading() && x.d.Version.R2010 {
+			eTableStyleToR24(b)
+			// the classic fields are not stored in R2010+ files
+			*b = dwg.TableStyle{Description: b.Description, Unknown1: b.Unknown1, Unknown2: b.Unknown2,
+				Unknown3: b.Unknown3, UnknownOwner: b.UnknownOwner, TableCell: b.TableCell, CellStyles: b.CellStyles}
+		}
 	})
+}
+
+// eTableStyleToR24 builds the R24 (R2010+) TABLESTYLE body from the classic DXF fields, filling the
+// rest with the values AutoCAD writes for a default table style ("Table" cell style plus _TITLE,
+// _HEADER and _DATA). The classic DXF record does not carry the full cell style map.
+func eTableStyleToR24(b *dwg.TableStyle) {
+	b.Unknown1, b.Unknown2, b.Unknown3 = 0, 0, 101
+	b.UnknownOwner = dwg.Ref{Code: 3}
+	b.TableCell = dwg.CellStyle{
+		Type: 5, DataFlags: 1, BgColor: dwg.CmColor{RGB: eRGB(0xC8, 0)}, LayoutFlags: 1,
+		Content: dwg.ContentFormat{ValueType: 512, BlockScale: 1, CellAlignment: 1,
+			ContentColor: dwg.CmColor{RGB: eRGB(0xC1, 0)}, TextStyle: dwg.Ref{Code: 5}, TextHeight: 0.18},
+		MarginOverride: 1,
+		Margins:        [6]float64{b.VertMargin, b.HorzMargin, b.VertMargin, b.HorzMargin, 0.18, 0.18},
+		ID:             4, Class: 2, Name: "Table",
+	}
+	if b.FlowDirection == 1 {
+		b.TableCell.PropOverride |= 0x10000
+	}
+	type spec struct {
+		row        int
+		id, class  int32
+		name       string
+		mergeFlags int32
+	}
+	b.CellStyles = b.CellStyles[:0]
+	b.LeadIDs = nil
+	for _, sp := range []spec{{1, 1, 1, "_TITLE", 0x8000}, {2, 2, 1, "_HEADER", 0}, {0, 3, 2, "_DATA", 0}} {
+		r := &b.Rows[sp.row]
+		bg := r.FillColor
+		if !r.BgEnabled {
+			bg = dwg.CmColor{RGB: eRGB(0xC8, 0)}
+		}
+		vt := r.DataType
+		if vt == 0 || vt == 512 {
+			vt = 4
+		}
+		cs := dwg.CellStyle{
+			Type: 5, DataFlags: 1, MergeFlags: sp.mergeFlags, BgColor: bg, LayoutFlags: 1,
+			Content: dwg.ContentFormat{ValueType: vt, ValueUnit: r.UnitType, ValueFormat: r.FormatStr, BlockScale: 1,
+				CellAlignment: int32(r.TextAlign), ContentColor: r.TextColor, TextStyle: dwg.Ref{Code: 5, H: r.TextStyle.H},
+				TextHeight: r.TextHeight},
+			ID: sp.id, Class: sp.class, Name: sp.name,
+		}
+		if b.HorzMargin != 0.06 || b.VertMargin != 0.06 {
+			// non-default margins are repeated as overrides on each cell style (observed)
+			cs.MarginOverride = 1
+			cs.Margins = b.TableCell.Margins
+		}
+		for k, edge := range eTableBorderEdges {
+			bd := r.Borders[k]
+			inv := int32(0)
+			if !bd.Visible {
+				inv = 1
+			}
+			cs.Borders = append(cs.Borders, dwg.CellBorder{EdgeFlags: edge, Type: 1, Color: bd.Color,
+				Lineweight: int32(bd.Lineweight), Ltype: dwg.Ref{Code: 5}, Invisible: inv, DoubleSpace: 0.045})
+		}
+		// R24 orders borders by edge flag
+		sort.Slice(cs.Borders, func(i, j int) bool { return cs.Borders[i].EdgeFlags < cs.Borders[j].EdgeFlags })
+		b.CellStyles = append(b.CellStyles, cs)
+	}
 }
 
 // eTableBorderEdges maps the classic border order (top, inside horizontal, bottom, left, inside vertical,
