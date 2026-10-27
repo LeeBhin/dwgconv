@@ -57,6 +57,15 @@ type Section struct {
 	// R2007 only (§5.2): section hash code and page encoding (1 = plain, 4 = interleaved RS).
 	Hash     uint64
 	Encoding int32
+	// R21Pages are the stored pages of an R2007 section as read (diagnostics: DWGCONV_R21_ORIG
+	// makes the writer reuse them instead of re-compressing).
+	R21Pages []R21StoredPage
+}
+
+// R21StoredPage is one R2007 data page as stored: logical start, sizes and compressed bytes.
+type R21StoredPage struct {
+	Start, USize int
+	Comp         []byte
 }
 
 // File is a parsed DWG container.

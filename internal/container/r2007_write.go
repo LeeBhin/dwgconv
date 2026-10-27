@@ -2,6 +2,7 @@ package container
 
 import (
 	"encoding/binary"
+	"os"
 	"unicode/utf16"
 )
 
@@ -27,18 +28,56 @@ var r21Hash = map[string]uint64{
 var r21Plain = map[string]bool{"AcDb:SummaryInfo": true, "AcDb:Preview": true, "AcDb:AppInfo": true,
 	"AcDb:AppInfoHistory": true, "AcDb:FileDepList": true, "AcDb:VBAProject": true}
 
-// rsEncodeSequential encodes data (padded to size bytes) as non-interleaved RS(255,k) codewords:
-// all data first, then the parity of every block; the last block may be shortened (§5.13.1).
-func rsEncodeSequential(data []byte, size int, rs *rsCode) []byte {
-	buf := make([]byte, size)
-	copy(buf, data)
-	out := append([]byte(nil), buf...)
-	for b := 0; b < size; b += rs.k {
-		blk := make([]byte, rs.k)
-		copy(blk, buf[b:min(b+rs.k, size)])
-		out = append(out, rs.encode(blk)...)
+// r21RandomBytes is the CRC random encoding table of §5.11 as little-endian bytes.
+func r21RandomBytes(seed uint64) []byte {
+	t := make([]uint32, 0x270)
+	t[0] = uint32(seed)*0x343FD + 0x269EC3
+	t[1] = uint32(seed>>32)*0x343FD + 0x269EC3
+	v := t[1]
+	for i := uint32(2); i < 0x270; i++ {
+		v = (v>>0x1E^v)*0x6C078965 + i
+		t[i] = v
+	}
+	out := make([]byte, 0, 4*len(t))
+	for _, x := range t {
+		out = binary.LittleEndian.AppendUint32(out, x)
 	}
 	return out
+}
+
+// randomFill returns n bytes of the random table from its start, repeating it if needed.
+func randomFill(rnd []byte, n int) []byte {
+	out := make([]byte, 0, n)
+	for len(out) < n {
+		out = append(out, rnd[:min(len(rnd), n-len(out))]...)
+	}
+	return out
+}
+
+// plainPageSize is the file size of a plain (encoding 1) page: room for max bytes of data in
+// RS(255,251) blocks, the last one shortened, aligned to 0x20.
+func plainPageSize(max int) int {
+	full, rem := max/251, max%251
+	size := full * 255
+	if rem > 0 {
+		size += rem + 4
+	}
+	return align(size, 0x20)
+}
+
+// rsEncodePlain writes a plain (encoding 1) page as AutoCAD does: the data (8-aligned), then the
+// RS(255,251) parity of each data block — the last block is completed with the random table for
+// the parity but those bytes are not stored — then the random table fills the page (observed).
+func rsEncodePlain(data []byte, max int, rnd []byte) []byte {
+	al := align(len(data), 8)
+	out := make([]byte, al, plainPageSize(max))
+	copy(out, data)
+	for b := 0; b < al; b += 251 {
+		blk := append([]byte(nil), out[b:min(b+251, al)]...)
+		blk = append(blk, randomFill(rnd, 251-len(blk))...)
+		out = append(out, rsData.encode(blk)...)
+	}
+	return append(out, randomFill(rnd, cap(out)-len(out))...)
 }
 
 // rsEncodeInterleaved encodes data (padded with zeros to whole blocks) into n interleaved
@@ -79,12 +118,14 @@ func systemPageSize(dataSize int) int {
 
 // encodeSystemPage compresses data (kept as is when that is not shorter), repeats it to fill the
 // page and RS(255,239) encodes it interleaved. It returns the stored (compressed) bytes too.
-func encodeSystemPage(plain []byte) (page []byte, factor int, data []byte) {
+func encodeSystemPage(plain []byte, size int) (page []byte, factor int, data []byte) {
 	data = Compress21(plain)
 	if len(data) >= len(plain) {
 		data = plain
 	}
-	size := systemPageSize(len(plain))
+	if size == 0 {
+		size = systemPageSize(len(plain))
+	}
 	aligned := align(len(data), 8)
 	maxBlocks := size / 255
 	factor = maxBlocks * 239 / aligned
@@ -137,6 +178,12 @@ func (f *File) writeR2007() []byte {
 		if max <= 0 {
 			max = 0xF800
 		}
+		if os.Getenv("DWGCONV_R21_ORIG") != "" && len(s.R21Pages) > 0 && !r21Plain[s.Name] {
+			for _, rp := range s.R21Pages {
+				plans = append(plans, plan{s, rp.Start, max, s.Data[rp.Start : rp.Start+rp.USize], rp.Comp})
+			}
+			continue
+		}
 		for start := 0; start < len(s.Data); {
 			chunk := s.Data[start:min(start+max, len(s.Data))]
 			comp := chunk
@@ -156,7 +203,14 @@ func (f *File) writeR2007() []byte {
 			start += len(chunk)
 		}
 	}
-	pmBase := int64(r21Base + systemPageSize(16*(len(plans)+4)))
+	gap := 0 // AutoCAD leaves a gap page after the page map; readers do not need it
+	nEntries := len(plans) + 4
+	pmBase := int64(r21Base + r21PageMapPageSize(nEntries) + gap)
+	seed := uint64(r21DefaultRandomSeed)
+	if f.R21 != nil {
+		seed = f.R21.Fields[r21RandomSeed]
+	}
+	rnd := r21RandomBytes(seed)
 	var dataPages []r21PageOut
 	secPages := map[*Section][]r21SectionPage{}
 	firstPagePos := map[string]int64{}
@@ -171,7 +225,7 @@ func (f *File) writeR2007() []byte {
 				chunk = rebasePreview(chunk, uint32(pmBase+stream))
 				comp = chunk
 			}
-			enc = rsEncodeSequential(chunk, pl.max, rsData)
+			enc = rsEncodePlain(chunk, pl.max, rnd)
 		} else {
 			stored := make([]byte, align(len(comp), 8))
 			copy(stored, comp)
@@ -185,7 +239,8 @@ func (f *File) writeR2007() []byte {
 		}
 		stream += int64(len(pageBytes))
 		secPages[s] = append(secPages[s], r21SectionPage{
-			start: int64(pl.start), size: int64(pl.max), id: id, usize: int64(len(chunk)),
+			// the page size field is the page's own size: AutoCAD rejects a section max here
+			start: int64(pl.start), size: int64(len(chunk)), id: id, usize: int64(len(chunk)),
 			csize: int64(len(comp)), checksum: pageChecksum21(0, chunk),
 			crc: crc64Mirrored(updateSeed1(0, uint32(len(comp))), comp),
 		})
@@ -245,14 +300,16 @@ func (f *File) writeR2007() []byte {
 
 	smID, sm2ID := id+1, id+2
 	pmID, pm2ID := id+3, id+4
-	smPage, smFactor, smStored := encodeSystemPage(sm)
+	smPage, smFactor, smStored := encodeSystemPage(sm, 0)
 
 	// page map: [page map][data pages][section map][section map copy][page map copy]
 	type entry struct{ size, id int64 }
 	var entries []entry
-	pmUncompSize := 16 * (len(dataPages) + 4)
-	pmSize := int64(systemPageSize(pmUncompSize))
+	pmSize := int64(r21PageMapPageSize(nEntries))
 	entries = append(entries, entry{pmSize, pmID})
+	if gap > 0 {
+		entries = append(entries, entry{int64(gap), -(pm2ID + 1)})
+	}
 	for _, p := range dataPages {
 		entries = append(entries, entry{int64(len(p.bytes)), p.id})
 	}
@@ -263,10 +320,11 @@ func (f *File) writeR2007() []byte {
 		pm = binary.LittleEndian.AppendUint64(pm, uint64(e.size))
 		pm = binary.LittleEndian.AppendUint64(pm, uint64(e.id))
 	}
-	pmPage, pmFactor, pmStored := encodeSystemPage(pm)
+	pmPage, pmFactor, pmStored := encodeSystemPage(pm, int(pmSize))
 
 	// assemble the stream after the 0x480 byte prefix
 	body := append([]byte(nil), pmPage...)
+	body = append(body, make([]byte, gap)...)
 	for _, p := range dataPages {
 		body = append(body, p.bytes...)
 	}
@@ -297,7 +355,7 @@ func (f *File) writeR2007() []byte {
 		F[r21SectionsMapCrcSeed] = 0x224b3db15918d418
 		F[r21CrcSeed] = 0
 		F[r21CrcSeedEncoded] = 0x378b39e75100c248
-		F[r21RandomSeed] = 0xe04f59ccd2f8a785
+		F[r21RandomSeed] = r21DefaultRandomSeed
 	}
 	F[0] = 0x70
 	F[1] = uint64(0x480 + len(body) + 0x400)
@@ -312,6 +370,9 @@ func (f *File) writeR2007() []byte {
 	F[r21PagesMapSizeUncomp] = uint64(len(pm))
 	F[r21PagesAmount] = uint64(len(entries))
 	F[r21PagesMaxId] = uint64(pm2ID)
+	if gap > 0 {
+		F[r21PagesMaxId] = uint64(pm2ID + 1)
+	}
 	F[r21PagesMapCrcUncompressed] = crc64Mirrored(updateSeed1(0, uint32(len(pm))), pm)
 	F[r21SectionsAmount] = uint64(sections)
 	F[r21SectionsMapCrcUncomp] = crc64Mirrored(updateSeed1(0, uint32(len(sm))), sm)
@@ -329,7 +390,7 @@ func (f *File) writeR2007() []byte {
 	setAddr := func(off int, name string) {
 		v := uint32(0)
 		if p, ok := firstPagePos[name]; ok {
-			v = uint32(p + int64(len(pmPage)) + r21Base)
+			v = uint32(p + int64(len(pmPage)+gap) + r21Base)
 		}
 		binary.LittleEndian.PutUint32(out[off:], v)
 	}
@@ -358,6 +419,8 @@ var (
 		0xe1, 0xb0, 0x5a, 0xbc, 0xf4, 0x3c, 0x1c, 0x38, 0xb9, 0xd8, 0x0b, 0x15, 0x4f, 0x65, 0xa2, 0x7a, 0xd0, 0x23,
 		0x07, 0x05, 0x08, 0x08, 0x14, 0x28, 0x9b, 0x15}
 	r21DefaultCheckSeq uint64 = 0x1944b8f351bc0406
+	// r21DefaultRandomSeed is the RandomSeed (header 0x100) written with the values above.
+	r21DefaultRandomSeed uint64 = 0x6f341ff1e4380a31
 )
 
 // buildR21HeaderPage encodes the 0x400 byte file header page (§5.2.1) for the header fields F.
@@ -418,3 +481,7 @@ func rebasePreview(data []byte, base uint32) []byte {
 	}
 	return out
 }
+
+// r21PageMapPageSize is the size AutoCAD gives the page map page: room for (entries + 5) * 16
+// bytes (§5.2 "((dataSectionPageCount + 5) * 16)"), not the plain system page rule.
+func r21PageMapPageSize(entries int) int { return systemPageSize((entries + 5) * 16) }

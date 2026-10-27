@@ -179,6 +179,7 @@ func readR2007(raw []byte, f *File) error {
 			if err != nil {
 				return fmt.Errorf("r2007 section %s page %d: %w", s.Name, id, err)
 			}
+			s.R21Pages = append(s.R21Pages, R21StoredPage{int(start), int(usize), r21StoredBytes(raw, pg.offset+r21Base, csize, s.Encoding)})
 			if start < int64(len(s.Data)) {
 				copy(s.Data[start:], plain)
 			}
@@ -207,4 +208,14 @@ func readR21DataPage(raw []byte, pos, comp, uncomp int64, encoding int32) ([]byt
 		return d[:uncomp], nil
 	}
 	return Decompress21(d, int(uncomp))
+}
+
+// r21StoredBytes returns the compressed bytes of a data page (RS decoded, not decompressed).
+func r21StoredBytes(raw []byte, pos, comp int64, encoding int32) []byte {
+	blocks := int((((comp + 7) &^ 7) + 250) / 251)
+	end := min(pos+int64(blocks)*255, int64(len(raw)))
+	if encoding == 4 {
+		return rsDeinterleave(raw[pos:end], blocks, 251)[:comp]
+	}
+	return append([]byte(nil), raw[pos:pos+comp]...)
 }
