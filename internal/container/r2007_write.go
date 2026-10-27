@@ -118,67 +118,77 @@ func (f *File) writeR2007() []byte {
 	for _, s := range f.Sections {
 		byName[s.Name] = s
 	}
-	// the page map size depends only on the number of pages, so the final address of every data
-	// page is known while encoding it (needed to rebase the preview's absolute addresses)
-	nPages := 0
-	for _, n := range r21StreamOrder {
-		if s := byName[n]; s != nil {
-			max := int(s.MaxSize)
-			if max <= 0 {
-				max = 0xF800
-			}
-			nPages += (len(s.Data) + max - 1) / max
-		}
-	}
-	pmBase := int64(r21Base + systemPageSize(16*(nPages+4)))
-	var dataPages []r21PageOut
-	secPages := map[*Section][]r21SectionPage{}
-	firstPagePos := map[string]int64{}
-	var id int64
-	stream := int64(0) // position after the page map page, filled in below
 	var order []*Section
 	for _, n := range r21StreamOrder {
 		if s := byName[n]; s != nil {
 			order = append(order, s)
 		}
 	}
+	// Plan the pages first: the page map size depends on the page count, and the final address of
+	// the preview page must be known before it is encoded.
+	type plan struct {
+		s           *Section
+		start, max  int
+		chunk, comp []byte
+	}
+	var plans []plan
 	for _, s := range order {
 		max := int(s.MaxSize)
 		if max <= 0 {
 			max = 0xF800
 		}
-		for start := 0; start < len(s.Data); start += max {
+		for start := 0; start < len(s.Data); {
 			chunk := s.Data[start:min(start+max, len(s.Data))]
-			if s.Name == "AcDb:Preview" && start == 0 {
-				chunk = rebasePreview(chunk, uint32(pmBase+stream))
-			}
-			id++
-			var comp, enc []byte
-			if r21Plain[s.Name] {
-				comp = chunk
-				enc = rsEncodeSequential(chunk, max, rsData)
-			} else {
+			comp := chunk
+			if !r21Plain[s.Name] {
 				comp = Compress21(chunk)
 				if len(comp) >= len(chunk) {
+					// Stored as is. A raw page of several interleaved blocks is read differently by
+					// different readers (AutoCAD only writes single-block raw pages), so raw pages are
+					// cut to one RS block (248 bytes, 8-aligned <= 251).
+					if len(chunk) > 248 {
+						chunk = chunk[:248]
+					}
 					comp = chunk
 				}
-				stored := make([]byte, align(len(comp), 8))
-				copy(stored, comp)
-				enc = rsEncodeInterleaved(stored, rsData)
 			}
-			pageBytes := make([]byte, align(len(enc), 0x20))
-			copy(pageBytes, enc)
-			dataPages = append(dataPages, r21PageOut{id, pageBytes})
-			if _, ok := firstPagePos[s.Name]; !ok {
-				firstPagePos[s.Name] = stream
-			}
-			stream += int64(len(pageBytes))
-			secPages[s] = append(secPages[s], r21SectionPage{
-				start: int64(start), size: int64(max), id: id, usize: int64(len(chunk)),
-				csize: int64(len(comp)), checksum: pageChecksum21(0, chunk),
-				crc: crc64Mirrored(updateSeed1(0, uint32(len(comp))), comp),
-			})
+			plans = append(plans, plan{s, start, max, chunk, comp})
+			start += len(chunk)
 		}
+	}
+	pmBase := int64(r21Base + systemPageSize(16*(len(plans)+4)))
+	var dataPages []r21PageOut
+	secPages := map[*Section][]r21SectionPage{}
+	firstPagePos := map[string]int64{}
+	var id int64
+	stream := int64(0) // position after the page map page
+	for _, pl := range plans {
+		s, chunk, comp := pl.s, pl.chunk, pl.comp
+		id++
+		var enc []byte
+		if r21Plain[s.Name] {
+			if s.Name == "AcDb:Preview" && pl.start == 0 {
+				chunk = rebasePreview(chunk, uint32(pmBase+stream))
+				comp = chunk
+			}
+			enc = rsEncodeSequential(chunk, pl.max, rsData)
+		} else {
+			stored := make([]byte, align(len(comp), 8))
+			copy(stored, comp)
+			enc = rsEncodeInterleaved(stored, rsData)
+		}
+		pageBytes := make([]byte, align(len(enc), 0x20))
+		copy(pageBytes, enc)
+		dataPages = append(dataPages, r21PageOut{id, pageBytes})
+		if _, ok := firstPagePos[s.Name]; !ok {
+			firstPagePos[s.Name] = stream
+		}
+		stream += int64(len(pageBytes))
+		secPages[s] = append(secPages[s], r21SectionPage{
+			start: int64(pl.start), size: int64(pl.max), id: id, usize: int64(len(chunk)),
+			csize: int64(len(comp)), checksum: pageChecksum21(0, chunk),
+			crc: crc64Mirrored(updateSeed1(0, uint32(len(comp))), comp),
+		})
 	}
 
 	// section map (§5.2), in the original section map order, ending with the empty section
