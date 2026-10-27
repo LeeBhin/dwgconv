@@ -46,6 +46,7 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 	if !ok {
 		return nil, nil, fmt.Errorf("unsupported output version %q (R2004, R2007, R2010, R2013, R2018)", version)
 	}
+	f = withDefaults(f) // DXF with entities only: complete it with the default drawing
 	cp := dwg.CodepageNumber(headerString(f, "$DWGCODEPAGE"))
 	d := dwg.NewDocument(ver, cp)
 	x := &ctx{d: d, names: map[uint64]string{}, byName: map[string]map[string]uint64{}, outVersion: ver}
