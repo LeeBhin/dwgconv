@@ -2,6 +2,7 @@ package conv
 
 import (
 	"encoding/binary"
+	"strconv"
 	"os"
 	"fmt"
 	"reflect"
@@ -145,21 +146,52 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 		x.addAppID(mleaderApp, "ACAD_MLEADERVER")
 	}
 
-	// BLOCKS and ENTITIES: entities are attached to their owner (block record or parent entity)
+	// BLOCKS and ENTITIES: entities are attached to their owner (block record or parent entity).
+	// Records written by other tools may lack the owner (330) or even the handle (5): like AutoCAD,
+	// ENTITIES records then go to *Model_Space (*Paper_Space with 67=1) and BLOCKS records to the
+	// block being defined; missing or duplicate handles get fresh ones.
+	nextHandle := maxRecordHandle(f) + 1
 	for _, sec := range []string{"BLOCKS", "ENTITIES"} {
 		s := f.Section(sec)
 		if s == nil {
 			continue
 		}
+		var curBlock uint64
 		for _, r := range s.Records {
 			if r.Type == "ENDSEC" {
 				continue
+			}
+			if h := r.Handle(5); h == 0 || d.ByHandle[h] != nil {
+				setHandle(r, strings.ToUpper(strconv.FormatUint(nextHandle, 16)))
+				nextHandle++
+			}
+			_, owner := ownerPos(r)
+			if sec == "BLOCKS" && r.Type == "BLOCK" {
+				curBlock = owner
+				if curBlock == 0 {
+					name, _ := r.Value(2)
+					curBlock = x.byName["BLOCK_RECORD"][nameKey(name)]
+				}
+			}
+			if owner == 0 {
+				owner = curBlock
+				if sec == "ENTITIES" {
+					owner = x.ms
+					if v, ok := r.Value(67); ok && strings.TrimSpace(v) == "1" {
+						owner = x.ps
+					}
+				}
+				if owner != 0 {
+					setOwner(r, strings.ToUpper(strconv.FormatUint(owner, 16)))
+				}
 			}
 			o := add(r, true)
 			if o == nil {
 				continue
 			}
-			x.attachEntity(o, r.Type)
+			if !x.attachEntity(o, r.Type) {
+				warn = append(warn, r.Type+"(no owner)")
+			}
 		}
 	}
 
@@ -306,10 +338,10 @@ func (x *ctx) registerNames(f *dxf.File) {
 }
 
 // attachEntity links an imported entity into its owner's lists.
-func (x *ctx) attachEntity(o *dwg.Object, typ string) {
+func (x *ctx) attachEntity(o *dwg.Object, typ string) bool {
 	owner := x.d.ByHandle[o.Owner.H]
 	if owner == nil {
-		return
+		return false
 	}
 	if bh, ok := owner.Body.(*dwg.BlockHeader); ok {
 		switch typ {
@@ -323,24 +355,25 @@ func (x *ctx) attachEntity(o *dwg.Object, typ string) {
 		default:
 			bh.Entities = append(bh.Entities, dwg.Ref{Code: 3, H: o.Handle})
 		}
-		return
+		return true
 	}
 	if owner.Body == nil {
-		return
+		return false
 	}
 	v := reflect.ValueOf(owner.Body).Elem()
 	if typ == "SEQEND" {
 		if f := v.FieldByName("SeqEnd"); f.IsValid() {
 			f.Set(reflect.ValueOf(dwg.Ref{Code: 3, H: o.Handle}))
 		}
-		return
+		return true
 	}
 	for _, name := range []string{"Attribs", "Vertices"} {
 		if f := v.FieldByName(name); f.IsValid() {
 			f.Set(reflect.Append(f, reflect.ValueOf(dwg.Ref{Code: 3, H: o.Handle})))
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // finishBlockHeaders fills the INSERT back references of each block record.
@@ -554,4 +587,56 @@ func (x *ctx) addAppID(h uint64, name string) {
 			tc.Entries = append(tc.Entries, dwg.Ref{Code: 2, H: h})
 		}
 	}
+}
+
+// maxRecordHandle returns the largest record handle (5 or 105) in the DXF.
+func maxRecordHandle(f *dxf.File) uint64 {
+	var max uint64
+	for _, sec := range f.Sections {
+		for _, r := range sec.Records {
+			for _, c := range []int{5, 105} {
+				if h := r.Handle(c); h > max {
+					max = h
+				}
+			}
+		}
+	}
+	return max
+}
+
+// setHandle sets the record handle (group 5), inserting it first if absent.
+func setHandle(r *dxf.Record, value string) {
+	for i := range r.Groups {
+		if r.Groups[i].Code == 5 {
+			r.Groups[i].Value = value
+			return
+		}
+	}
+	r.Groups = append([]dxf.Group{{Code: 5, Value: value}}, r.Groups...)
+}
+
+// ownerPos returns the index right after the handle and any 102 {...} blocks, where the owner
+// (330) belongs, and the owner handle if one is there.
+func ownerPos(r *dxf.Record) (int, uint64) {
+	i := 0
+	if i < len(r.Groups) && r.Groups[i].Code == 5 {
+		i++
+	}
+	for i < len(r.Groups) && r.Groups[i].Code == 102 {
+		i++
+		for i < len(r.Groups) && r.Groups[i].Code != 102 {
+			i++
+		}
+		i++ // closing "}"
+	}
+	if i < len(r.Groups) && r.Groups[i].Code == 330 {
+		return i, r.Groups[i].Handle()
+	}
+	return i, 0
+}
+
+// setOwner inserts the owner (330) where DXF places it.
+func setOwner(r *dxf.Record, value string) {
+	at, _ := ownerPos(r)
+	r.Groups = append(r.Groups[:at], append([]dxf.Group{{Code: 330, Value: value}}, r.Groups[at:]...)...)
 }
