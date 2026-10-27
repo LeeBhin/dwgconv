@@ -232,8 +232,8 @@ func dMaterialRec(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Material) {
 	m.FloatDef(145, &b.RefractionIndex, 1)
 	dMatMap(m, [7]int{146, 273, 9, 274, 275, 276, 147}, &b.RefractionMap, 2)
 	flags := b.ChannelFlags
-	if !x.d.Version.R2010 {
-		// R2004 has no channel flags; ODA writes 127 when the diffuse map source is 0 and 63
+	if !x.d.Version.R2007 {
+		// R2004 has no channel flags (R2007+ stores them); ODA writes 127 when the diffuse map source is 0 and 63
 		// otherwise (the R2010+ samples hold the same pairing).
 		flags = 63
 		if b.DiffuseMap.Source == 0 {
@@ -241,7 +241,7 @@ func dMaterialRec(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Material) {
 		}
 	}
 	m.Int32(94, &flags)
-	if m.Reading() && x.d.Version.R2010 {
+	if m.Reading() && x.d.Version.R2007 {
 		b.ChannelFlags = flags
 	}
 }

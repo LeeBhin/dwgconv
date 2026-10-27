@@ -130,10 +130,10 @@ func (b *VisualStyle) data(c *codec, o *Object) {
 			b.Legacy = &VSLegacy{}
 		}
 		b.Legacy.code(c)
-		c.B(&b.Internal)
 		if c.R2007 {
-			c.BB(&b.Unknown2007) // R2007 only: two more bits (observed; meaning unknown)
+			c.BB(&b.Unknown2007) // R2007 only: two more bits before Internal (observed; meaning unknown)
 		}
+		c.B(&b.Internal)
 		return
 	}
 	c.BS(&b.Flags)
