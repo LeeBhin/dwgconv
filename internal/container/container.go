@@ -66,6 +66,9 @@ type File struct {
 	Header   [0x6C]byte // decrypted file header data
 	Sections []*Section // in section map order
 	R21      *R21Header // R2007 file header
+	R21Check []byte     // R2007 header page check data (0x28 bytes at 0x3D8), reused on rewrite
+	// R21CheckSeq is the header page check sequence value (reused on rewrite).
+	R21CheckSeq uint64
 }
 
 func (f *File) Section(name string) *Section {
@@ -273,6 +276,9 @@ func systemPage(typ uint32, plain []byte) []byte {
 
 // Write serializes the container. Prefix page addresses (preview, summary info, app info...) are recomputed.
 func (f *File) Write() []byte {
+	if f.Version == "AC1021" {
+		return f.writeR2007()
+	}
 	secs := append([]*Section(nil), f.Sections...)
 	sort.SliceStable(secs, func(i, j int) bool { return streamRank(secs[i].Name) < streamRank(secs[j].Name) })
 

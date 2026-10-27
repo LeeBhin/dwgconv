@@ -112,6 +112,8 @@ func readR2007(raw []byte, f *File) error {
 		return err
 	}
 	f.R21 = h
+	f.R21Check = append([]byte(nil), raw[0x80+0x3D8:0x80+0x400]...)
+	f.R21CheckSeq = binary.LittleEndian.Uint64(rsDeinterleave(raw[0x80:], 3, 239)[8:])
 	F := h.Fields
 	pm, err := readR21SysPage(raw, int64(F[r21PagesMapOffset])+r21Base, F[r21PagesMapSizeCompressed],
 		F[r21PagesMapSizeUncomp], F[r21PagesMapCorrection])

@@ -122,8 +122,26 @@ func r21LiteralLength(src []byte, si *int, op byte) int {
 }
 
 // r21Instructions decodes a back-reference instruction (§5.10.2).
+// r21OpStats counts instruction forms seen by the decoder (diagnostics).
+var r21OpStats map[string]int
+
 func r21Instructions(src []byte, si *int, op *byte) (offset, length int) {
 	o := *op
+	if r21OpStats != nil {
+		k := "default"
+		switch o >> 4 {
+		case 0:
+			k = "0x0X"
+		case 1:
+			k = "0x1X"
+		case 2:
+			k = "0x2X"
+			if o&8 != 0 {
+				k = "0x2X-long"
+			}
+		}
+		r21OpStats[k]++
+	}
 	switch o >> 4 {
 	case 0:
 		length = int(o&0xF) + 0x13
@@ -239,4 +257,111 @@ func Decompress21(src []byte, outSize int) (out []byte, err error) {
 		return out, fmt.Errorf("lz21: got %d bytes, want %d", len(out), outSize)
 	}
 	return out, nil
+}
+
+// putLiteral21 writes a literal run of n bytes (n >= 1) for use after an instruction whose low
+// 3 bits were 0, or at the start of the stream (n >= 8 there).
+func putLiteralLen21(dst []byte, n int) []byte {
+	if n <= 0x16 {
+		return append(dst, byte(n-8))
+	}
+	dst = append(dst, 0x0F)
+	r := n - 0x17
+	if r < 0xFF {
+		return append(dst, byte(r))
+	}
+	dst = append(dst, 0xFF)
+	r -= 0xFF
+	for r >= 0xFFFF {
+		dst = append(dst, 0xFF, 0xFF)
+		r -= 0xFFFF
+	}
+	return append(dst, byte(r), byte(r>>8))
+}
+
+// Compress21 produces an R2007 compressed stream (§5.10) that Decompress21 inflates back to src.
+// Matches use the 16-bit offset form (opcode 0x2X, length 3..255, distance 1..65535).
+func Compress21(src []byte) []byte {
+	n := len(src)
+	const hb = 15
+	head := make([]int, 1<<hb)
+	for i := range head {
+		head[i] = -1
+	}
+	prev := make([]int, n)
+	hash := func(i int) int {
+		v := uint32(src[i]) | uint32(src[i+1])<<8 | uint32(src[i+2])<<16
+		return int((v * 2654435761) >> (32 - hb))
+	}
+	insert := func(i int) {
+		if i+2 < n {
+			h := hash(i)
+			prev[i] = head[h]
+			head[h] = i
+		}
+	}
+	type match struct{ pos, length, dist int }
+	var ms []match
+	i := 0
+	for i < n {
+		best, bd := 0, 0
+		if i >= 8 && i+3 <= n {
+			for c, k := head[hash(i)], 0; c >= 0 && k < 64; c, k = prev[c], k+1 {
+				d := i - c
+				if d > 0xFFFF {
+					break
+				}
+				l := 0
+				for i+l < n && l < 255 && src[c+l] == src[i+l] {
+					l++
+				}
+				if l > best {
+					best, bd = l, d
+				}
+			}
+		}
+		if best >= 3 {
+			ms = append(ms, match{i, best, bd})
+			for k := 0; k < best; k++ {
+				insert(i + k)
+			}
+			i += best
+			continue
+		}
+		insert(i)
+		i++
+	}
+	var out []byte
+	first := n
+	if len(ms) > 0 {
+		first = ms[0].pos
+	}
+	if first < 8 { // a short first literal needs the 0x2X start form (only used for inputs < 8 bytes)
+		ms, first = nil, n
+	}
+	if first < 8 {
+		out = append(out, 0x20, 0, 0, byte(first))
+	} else {
+		out = putLiteralLen21(out, first)
+	}
+	out = append(out, unorderLiteral(src[:first])...)
+	for k, m := range ms {
+		end := n
+		if k+1 < len(ms) {
+			end = ms[k+1].pos
+		}
+		lit := end - (m.pos + m.length)
+		lit3 := 0
+		if lit >= 1 && lit <= 7 {
+			lit3 = lit
+		}
+		out = append(out, byte(0x20|m.length&7), byte(m.dist), byte(m.dist>>8), byte(m.length&0xF8|lit3))
+		if lit >= 8 {
+			out = putLiteralLen21(out, lit)
+		}
+		if lit > 0 {
+			out = append(out, unorderLiteral(src[m.pos+m.length:end])...)
+		}
+	}
+	return out
 }
