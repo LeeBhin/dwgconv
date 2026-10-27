@@ -25,6 +25,15 @@ dwgconv in.dwg out.dxf
 dwgconv [-version R2018] in.dxf out.dwg   # R2004 | R2007 | R2010 | R2013 | R2018
 ```
 
+Go 라이브러리로도 쓸 수 있습니다. 여러 요청이 동시에 호출해도 안전합니다.
+
+```go
+import "github.com/LeeBhin/dwgconv"
+
+err := dwgconv.DWGToDXF(dwgReader, dxfWriter)
+dwgBytes, warnings, err := dwgconv.DXFToDWG(dxfReader, "R2018") // "" = R2018
+```
+
 ## 검증
 
 - 디코드 → 인코드가 원본과 비트 단위로 같습니다. 샘플 도면의 모든 객체로 확인했습니다 (`cmd/dwgcheck`).
