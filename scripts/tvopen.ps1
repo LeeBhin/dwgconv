@@ -12,6 +12,7 @@ foreach ($File in $Files) {
     $name = [IO.Path]::GetFileName($File)
     $start = Get-Date
     $openedAt = $null
+    $damaged = $false
     $seen = @{}
     while (((Get-Date) - $start).TotalSeconds -lt $timeout) {
         Start-Sleep -Milliseconds 1000
@@ -25,9 +26,20 @@ foreach ($File in $Files) {
             $key = "$t :: $msg"
             if (-not $seen.ContainsKey($key)) { $seen[$key] = $true; "  DIALOG $name : $key" }
         }
+        # dialogs are owned by the main window: search the whole tree of the process for them
+        foreach ($w in $wins) {
+            $dlg = $w.FindAll([Windows.Automation.TreeScope]::Descendants,
+                (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Window)))
+            foreach ($d in $dlg) {
+                $dt = $d.Current.Name
+                if ($dt -and -not $seen.ContainsKey($dt)) { $seen[$dt] = $true; "  DIALOG $name : $dt" }
+                if ($dt -like '*Damaged*' -or $dt -like '*not valid*') { $damaged = $true }
+            }
+        }
+        if ($damaged) { break }
         if ($openedAt -and ((Get-Date) - $openedAt).TotalSeconds -gt 6) { break }
     }
-    if ($openedAt) { "OPENED $name" } else { "NOT OPENED $name" }
+    if ($damaged) { "NEEDS RECOVERY $name" } elseif ($openedAt) { "OPENED $name" } else { "NOT OPENED $name" }
     Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
     Get-Process dwgviewr -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 1500

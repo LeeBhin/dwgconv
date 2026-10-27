@@ -120,12 +120,13 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 				if table == "BLOCK_RECORD" {
 					setNameField(o, dwgBlockName(name))
 				}
-				// special records: *MODEL_SPACE, *PAPER_SPACE and BYLAYER, BYBLOCK, in that order (§20.4.51, §20.4.57)
+				// special records: *MODEL_SPACE, *PAPER_SPACE and BYBLOCK, BYLAYER, in that order (as AutoCAD
+				// writes them; AUDIT reports "Special Name Incorrect" otherwise)
 				slot := -1
 				switch strings.ToUpper(name) {
-				case "*MODEL_SPACE", "BYLAYER":
+				case "*MODEL_SPACE", "BYBLOCK":
 					slot = 0
-				case "*PAPER_SPACE", "BYBLOCK":
+				case "*PAPER_SPACE", "BYLAYER":
 					slot = 1
 				}
 				switch {
@@ -176,6 +177,19 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 		}
 	}
 	x.finishBlockHeaders()
+	fixNullRefs(reflect.ValueOf(&x.hdr.Vars)) // header handles: no code-0 null references either
+	// dictionary entries pointing to objects the DXF did not carry are dropped (AUDIT erases them)
+	for _, o := range d.Objects {
+		if dict, ok := o.Body.(*dwg.Dictionary); ok {
+			names, items := dict.Names[:0:0], dict.Items[:0:0]
+			for i, it := range dict.Items {
+				if d.ByHandle[it.H] != nil {
+					names, items = append(names, dict.Names[i]), append(items, it)
+				}
+			}
+			dict.Names, dict.Items = names, items
+		}
+	}
 	for _, o := range d.Objects {
 		if bh, ok := o.Body.(*dwg.BlockHeader); ok {
 			bh.InsertCounts = bh.InsertCounts[:0] // one non-zero byte per insert (as AutoCAD writes)
@@ -369,8 +383,9 @@ func (x *ctx) finishHeaderRefs() {
 		}
 	}
 	if v.HANDSEED.H <= max {
-		v.HANDSEED = dwg.Ref{Code: 0, H: max + 1}
+		v.HANDSEED.H = max + 1
 	}
+	v.HANDSEED.Code = 0 // the handle seed is a plain value, not a reference (AutoCAD misreads the header otherwise)
 }
 
 // filePrefix builds the file header bytes 0x00-0x7F (§4.1) for a version; page addresses are

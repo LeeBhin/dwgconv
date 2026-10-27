@@ -13,7 +13,6 @@ import (
 
 func main() {
 	rewrite := flag.String("rewrite", "", "write the re-encoded container to this path (single input)")
-	keepRaw := flag.Bool("keepraw", false, "reuse the original compressed page payloads (diagnostics)")
 	flag.Parse()
 	for _, path := range flag.Args() {
 		f, err := container.ReadFile(path)
@@ -25,9 +24,6 @@ func main() {
 			binary.LittleEndian.Uint32(f.Prefix[0x2C:]), binary.LittleEndian.Uint32(f.Prefix[0x30:]))
 		for _, s := range f.Sections {
 			fmt.Printf("  %-24s id=%-2d size=%-8d comp=%d max=%#x\n", s.Name, s.ID, len(s.Data), s.Compressed, s.MaxSize)
-		}
-		if !*keepRaw {
-			f.RawPayloads = nil
 		}
 		out := f.Write()
 		g, err := container.Read(out)

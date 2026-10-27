@@ -61,9 +61,6 @@ type Section struct {
 
 // File is a parsed DWG container.
 type File struct {
-	// RawPayloads, when set, maps "section name@start offset" to a stored page payload that Write
-	// reuses instead of compressing (diagnostics: isolates the compressor from the layout).
-	RawPayloads map[string][]byte
 
 	Version  string
 	Prefix   [0x80]byte // raw bytes 0x00..0x7F (version, codepage, page addresses...)
@@ -176,12 +173,6 @@ func Read(raw []byte) (*File, error) {
 			loc, ok := pages[num]
 			if !ok {
 				return nil, fmt.Errorf("section %s: page %d missing", s.Name, num)
-			}
-			if f.RawPayloads == nil {
-				f.RawPayloads = map[string][]byte{}
-			}
-			if p, err := rawPagePayload(raw, loc.addr); err == nil {
-				f.RawPayloads[fmt.Sprintf("%s@%d", s.Name, start)] = p
 			}
 			plain, err := readDataPage(raw, loc.addr, s)
 			if err != nil {
@@ -315,11 +306,7 @@ func (f *File) Write() []byte {
 			copy(chunk, s.Data[start:])
 			payload := chunk
 			if s.Compressed == 2 {
-				if raw, ok := f.RawPayloads[fmt.Sprintf("%s@%d", s.Name, start)]; ok {
-					payload = raw
-				} else {
-					payload = Compress(chunk)
-				}
+				payload = Compress(chunk)
 			}
 			pid++
 			addr := int64(len(out))
@@ -442,12 +429,3 @@ func (f *File) Write() []byte {
 	return append(out, enc[:]...)
 }
 
-// rawPagePayload returns the stored (compressed) payload of a data page.
-func rawPagePayload(raw []byte, addr int64) ([]byte, error) {
-	mask := uint32(0x4164536B) ^ uint32(addr)
-	if binary.LittleEndian.Uint32(raw[addr:])^mask != pageTypeData {
-		return nil, fmt.Errorf("not a data page")
-	}
-	n := int64(binary.LittleEndian.Uint32(raw[addr+8:]) ^ mask)
-	return append([]byte(nil), raw[addr+32:addr+32+n]...), nil
-}
