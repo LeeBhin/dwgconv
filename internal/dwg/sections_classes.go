@@ -58,7 +58,7 @@ func (t *ClassTable) body(v Version, text TextCodec) (*bits.Writer, int) {
 	}
 	t.code(c)
 	out := &bits.Writer{}
-	if v.R2010 {
+	if v.R2007 {
 		out.RL(0) // bit size, counted from this field; patched below
 	}
 	out.AppendWriter(c.wd)
@@ -75,7 +75,7 @@ func (t *ClassTable) encode(v Version, text TextCodec, pad uint64, padBits int) 
 	}
 	out.PadByte()
 	body := out.Bytes()
-	if v.R2010 {
+	if v.R2007 {
 		binary.LittleEndian.PutUint32(body, uint32(endbit))
 	}
 	buf := append([]byte(nil), sentinelClassesStart...)

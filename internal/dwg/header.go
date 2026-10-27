@@ -36,6 +36,9 @@ type Header struct {
 	padBits int
 	// LeftData/LeftHandles are bits the decoder did not consume (diagnostics; 0 when the layout is fully known).
 	LeftData, LeftHandles, LeftStr int
+	// Extra2007 is the byte R2007 files store after the trailer in the handle stream.
+	Extra2007    byte
+	HasExtra2007 bool
 }
 
 // headerHasSizeHi reports whether the R2010+ extra size RL is present (§9).
@@ -90,6 +93,12 @@ func DecodeHeader(data []byte, v Version, text TextCodec, maint byte) (*Header, 
 		h.LeftHandles = c.hdl.Remaining()
 	}
 	tail := c.hdl
+	if v.R2007 && !v.R2010 && tail.Remaining() >= 8 {
+		// R2007 has 8 more bits after the trailer (observed; a null handle in the sample)
+		h.Extra2007 = byte(tail.Bits(8))
+		h.HasExtra2007 = true
+		h.LeftHandles = tail.Remaining()
+	}
 	if n := tail.Remaining(); n > 0 && n < 8 {
 		h.padBits = n
 		h.pad = tail.Bits(n)
@@ -112,6 +121,9 @@ func (h *Header) Encode(v Version, text TextCodec) []byte {
 	}
 	h.Vars.code(c)
 	h.codeTrailer(c)
+	if v.R2007 && !v.R2010 {
+		c.wh.Bits(uint64(h.Extra2007), 8) // null handle (0x00) when building from scratch
+	}
 	out := &bits.Writer{}
 	if v.R2007 {
 		out.RL(0) // bit size, patched below

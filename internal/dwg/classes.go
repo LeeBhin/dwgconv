@@ -81,6 +81,11 @@ func decodeClasses(data []byte, v Version, text TextCodec) (*ClassTable, error) 
 		bitsize := int(binary.LittleEndian.Uint32(data[24:]))
 		start = 28
 		endbit = 24*8 + bitsize
+	} else if v.R2007 {
+		// R2007 (§5.8): RL byte size, RL bit size counted from its own offset 20, data from 24
+		bitsize := int(binary.LittleEndian.Uint32(data[20:]))
+		start = 24
+		endbit = 20*8 + bitsize
 	} else {
 		endbit = (20 + size) * 8
 	}

@@ -118,6 +118,8 @@ type VisualStyle struct {
 	Internal bool   // 291
 	Props    []VSProp
 	Legacy   *VSLegacy
+	// Unknown2007 is a value only R2007 files store after the legacy fields.
+	Unknown2007 byte `conv:"derived"`
 }
 
 func (b *VisualStyle) data(c *codec, o *Object) {
@@ -129,6 +131,9 @@ func (b *VisualStyle) data(c *codec, o *Object) {
 		}
 		b.Legacy.code(c)
 		c.B(&b.Internal)
+		if c.R2007 {
+			c.BB(&b.Unknown2007) // R2007 only: two more bits (observed; meaning unknown)
+		}
 		return
 	}
 	c.BS(&b.Flags)
@@ -202,7 +207,7 @@ type Material struct {
 	BumpMap         MaterialMap
 	RefractionIndex float64 // 145
 	RefractionMap   MaterialMap
-	// R2010+ tail: four reals (0 in all samples), the channel flags (DXF 94) and a real.
+	// R2007+ tail: four reals (0 in all samples), the channel flags (DXF 94) and a real.
 	Tail         [4]float64 `conv:"derived"`
 	ChannelFlags int32      // 94
 	Tail2        float64    `conv:"derived"`
@@ -223,7 +228,7 @@ func (b *Material) data(c *codec, o *Object) {
 	b.BumpMap.code(c)
 	c.BD(&b.RefractionIndex)
 	b.RefractionMap.code(c)
-	if c.R2010 {
+	if c.R2007 { // the tail is present from R2007 (observed in an AC1021 file)
 		for i := range b.Tail {
 			c.BD(&b.Tail[i])
 		}

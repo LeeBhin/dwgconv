@@ -54,6 +54,9 @@ type Section struct {
 	Encrypted  int32
 	Unknown    uint32
 	Data       []byte
+	// R2007 only (§5.2): section hash code and page encoding (1 = plain, 4 = interleaved RS).
+	Hash     uint64
+	Encoding int32
 }
 
 // File is a parsed DWG container.
@@ -62,6 +65,7 @@ type File struct {
 	Prefix   [0x80]byte // raw bytes 0x00..0x7F (version, codepage, page addresses...)
 	Header   [0x6C]byte // decrypted file header data
 	Sections []*Section // in section map order
+	R21      *R21Header // R2007 file header
 }
 
 func (f *File) Section(name string) *Section {
@@ -90,6 +94,12 @@ func Read(raw []byte) (*File, error) {
 	f := &File{Version: string(raw[:6])}
 	switch f.Version {
 	case "AC1018", "AC1024", "AC1027", "AC1032":
+	case "AC1021":
+		copy(f.Prefix[:], raw[:0x80])
+		if err := readR2007(raw, f); err != nil {
+			return nil, err
+		}
+		return f, nil
 	default:
 		return nil, fmt.Errorf("container: unsupported version %s", f.Version)
 	}
