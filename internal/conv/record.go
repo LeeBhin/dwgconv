@@ -93,28 +93,36 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 }
 
 // fixNullRefs gives null handle references a pointer code: AutoCAD never writes code 0 for a
-// handle field, and readers reject it ("object improperly read").
-func fixNullRefs(v reflect.Value) {
+// handle field, and readers reject it ("object improperly read"). The code is the field's
+// `ref:"N"` tag (AutoCAD checks it, e.g. VPORT background 4 / sun 3), otherwise 5.
+func fixNullRefs(v reflect.Value) { fixNullRefsCode(v, 5) }
+
+func fixNullRefsCode(v reflect.Value, code byte) {
 	switch v.Kind() {
 	case reflect.Pointer, reflect.Interface:
 		if !v.IsNil() {
-			fixNullRefs(v.Elem())
+			fixNullRefsCode(v.Elem(), code)
 		}
 	case reflect.Struct:
 		if v.Type() == reflect.TypeOf(dwg.Ref{}) {
 			if r := v.Interface().(dwg.Ref); r.H == 0 && r.Code == 0 && v.CanSet() {
-				v.Set(reflect.ValueOf(dwg.Ref{Code: 5}))
+				v.Set(reflect.ValueOf(dwg.Ref{Code: code}))
 			}
 			return
 		}
 		for i := 0; i < v.NumField(); i++ {
-			if v.Type().Field(i).IsExported() || v.Type().Field(i).Anonymous {
-				fixNullRefs(v.Field(i))
+			f := v.Type().Field(i)
+			if f.IsExported() || f.Anonymous {
+				c := byte(5)
+				if t := f.Tag.Get("ref"); t != "" {
+					c = t[0] - '0'
+				}
+				fixNullRefsCode(v.Field(i), c)
 			}
 		}
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			fixNullRefs(v.Index(i))
+			fixNullRefsCode(v.Index(i), code)
 		}
 	}
 }

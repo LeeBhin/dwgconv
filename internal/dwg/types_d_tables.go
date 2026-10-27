@@ -344,9 +344,9 @@ type View struct {
 	UCSElevation   float64    // 146
 	OrthoType      int16      // 79
 	CameraPlotable bool       // 73
-	Background     Ref        // 332
+	Background     Ref        `ref:"4"` // 332, soft pointer
 	VisualStyle    Ref        // 348
-	Sun            Ref        // 361
+	Sun            Ref        `ref:"3"` // 361, hard owner
 	BaseUCS        Ref        // 346
 	NamedUCS       Ref        // 345
 	LiveSection    Ref        // 334
@@ -465,9 +465,9 @@ type VPort struct {
 	OrthoType   int16      // 79
 	GridFlags   int16      // 60
 	GridMajor   int16      // 61
-	Background  Ref        // 332
+	Background  Ref        `ref:"4"` // 332, soft pointer
 	VisualStyle Ref        // 348
-	Sun         Ref        // 361
+	Sun         Ref        `ref:"3"` // 361, hard owner
 	NamedUCS    Ref        // 345
 	BaseUCS     Ref        // 346
 }

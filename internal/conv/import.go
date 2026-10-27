@@ -50,6 +50,7 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 
 	x.importClasses(f.Section("CLASSES"))
 	x.registerNames(f)
+	mleaderApp := x.reserveMLeaderVerApp(f)
 	x.hdr = x.importHeader(f.Section("HEADER"))
 	x.measurement = 1
 	if m := headerString(f, "$MEASUREMENT"); m != "" {
@@ -137,6 +138,10 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 				}
 			}
 		}
+	}
+
+	if mleaderApp != 0 {
+		x.addAppID(mleaderApp, "ACAD_MLEADERVER")
 	}
 
 	// BLOCKS and ENTITIES: entities are attached to their owner (block record or parent entity)
@@ -505,6 +510,51 @@ func (x *ctx) markSavedByObjectVersion() {
 		}
 		if !has {
 			o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app}, Data: data})
+		}
+	}
+}
+
+// reserveMLeaderVerApp: R2007 MLEADERSTYLEs must carry the ACAD_MLEADERVER marker xdata (AutoCAD
+// rejects the old layout there; ODA attaches it too). When the DXF has MLEADERSTYLEs but no such
+// APPID, a handle is reserved for a new one and its name registered (the mapping then attaches
+// the xdata). Returns the reserved handle, or 0.
+func (x *ctx) reserveMLeaderVerApp(f *dxf.File) uint64 {
+	if x.outVersion != "AC1021" {
+		return 0
+	}
+	if _, ok := x.byName["APPID"]["ACAD_MLEADERVER"]; ok {
+		return 0
+	}
+	var max uint64
+	has := false
+	for _, s := range f.Sections {
+		for _, r := range s.Records {
+			if r.Type == "MLEADERSTYLE" {
+				has = true
+			}
+			for _, c := range []int{5, 105} {
+				if h := r.Handle(c); h > max {
+					max = h
+				}
+			}
+		}
+	}
+	if !has {
+		return 0
+	}
+	x.addName("APPID", "ACAD_MLEADERVER", max+1)
+	return max + 1
+}
+
+// addAppID creates an APPID table record and lists it in the APPID table control.
+func (x *ctx) addAppID(h uint64, name string) {
+	ctl := x.d.ByHandle[x.hdr.Vars.AppIDControl.H]
+	o := &dwg.Object{Handle: h, Type: 0x43, XDicMiss: true, Owner: dwg.Ref{Code: 4, H: x.hdr.Vars.AppIDControl.H},
+		Body: &dwg.AppID{TableEntry: dwg.TableEntry{Name: name, Flag64: true, XrefBlock: dwg.Ref{Code: 5}}}}
+	x.d.Add(o)
+	if ctl != nil {
+		if tc, ok := ctl.Body.(*dwg.TableControl); ok {
+			tc.Entries = append(tc.Entries, dwg.Ref{Code: 2, H: h})
 		}
 	}
 }
