@@ -72,6 +72,10 @@ func init() {
 				// R2004 marks the new format with ACAD_MLEADERVER EED (1070 = 2), which ODA drops.
 				o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app},
 					Data: groupsToEED([]dxf.Group{{Code: 1070, Value: "2"}}, false, x.d.Text)})
+			} else if !r2010 {
+				// no marker application to attach: write the old (pre-R2010) layout, which readers
+				// assume when the marker is absent
+				b.NewFormat = false
 			}
 		}
 	})

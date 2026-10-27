@@ -3,7 +3,9 @@ package dwg
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 
 	"dwgconv/internal/bits"
 	"dwgconv/internal/container"
@@ -114,6 +116,9 @@ func (d *Document) decodeObject(buf []byte, off int) *Object {
 	if typ >= 500 {
 		if i := typ - 500; i < len(d.Classes.Classes) {
 			mk = classBodyFactory[d.Classes.Classes[i].DXFName]
+			if rawClasses[d.Classes.Classes[i].DXFName] { // diagnostics: keep undecoded
+				mk = nil
+			}
 		}
 	} else {
 		mk = bodyFactory[typ]
@@ -231,3 +236,14 @@ func (d *Document) Add(o *Object) {
 
 // VersionCode is the numeric DWG version (§27): 25 R2004, 27 R2007, 29 R2010, 31 R2013, 33 R2018.
 func VersionCode(version string) int { return int(auxVersionCodes[version]) }
+
+// rawClasses (DWGCONV_RAW=NAME,NAME) keeps the named classes undecoded, for layout analysis.
+var rawClasses = func() map[string]bool {
+	m := map[string]bool{}
+	for _, n := range strings.Split(os.Getenv("DWGCONV_RAW"), ",") {
+		if n != "" {
+			m[n] = true
+		}
+	}
+	return m
+}()

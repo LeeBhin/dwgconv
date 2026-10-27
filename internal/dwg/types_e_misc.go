@@ -108,8 +108,11 @@ func (b *MLeaderStyle) data(c *codec, o *Object) {
 		c.BS(&b.AttachDirection)
 		c.BS(&b.TopAttachment)
 		c.BS(&b.BottomAttachment)
-		// Not in the spec: R2013/R2018 files carry one more bit here (no AC1024 sample to confirm R2010).
-		c.B(&b.UnknownBool)
+		// Not in the spec: R2013/R2018 files carry one more bit here; an AutoCAD 2010 (AC1024) file
+		// does not.
+		if c.R2013 {
+			c.B(&b.UnknownBool)
+		}
 	}
 }
 

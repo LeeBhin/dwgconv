@@ -138,15 +138,22 @@ func (b *VisualStyle) data(c *codec, o *Object) {
 	}
 	c.BS(&b.Flags)
 	c.B(&b.Internal)
-	if !c.w {
-		b.Props = make([]VSProp, len(VSPropCodes))
+	n := len(VSPropCodes)
+	if !c.R2013 {
+		n = VSPropsR2010 // R2010 stores properties 1-28 only (observed in an AutoCAD 2010 file)
 	}
-	for i, k := range VSPropCodes {
+	if !c.w {
+		b.Props = make([]VSProp, n)
+	}
+	for i, k := range VSPropCodes[:n] {
 		if i < len(b.Props) {
 			b.Props[i].code(c, k)
 		}
 	}
 }
+
+// VSPropsR2010 is the number of visual style properties R2010 files store; 29-58 came with R2013.
+const VSPropsR2010 = 28
 
 func (b *VisualStyle) handles(c *codec, o *Object) {}
 

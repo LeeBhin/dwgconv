@@ -178,6 +178,7 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 	}
 	x.finishBlockHeaders()
 	fixNullRefs(reflect.ValueOf(&x.hdr.Vars)) // header handles: no code-0 null references either
+	x.markSavedByObjectVersion()
 	// dictionary entries pointing to objects the DXF did not carry are dropped (AUDIT erases them)
 	for _, o := range d.Objects {
 		if dict, ok := o.Body.(*dwg.Dictionary); ok {
@@ -477,5 +478,33 @@ func setNameField(o *dwg.Object, name string) {
 	}
 	if f := reflect.ValueOf(o.Body).Elem().FieldByName("Name"); f.IsValid() && f.Kind() == reflect.String {
 		f.SetString(name)
+	}
+}
+
+// markSavedByObjectVersion attaches the ACAD "AcDbSavedByObjectVersion" xdata that AutoCAD puts on
+// objects of classes newer than the file format (visual styles in R2004/R2007 files); without it
+// AutoCAD rejects them ("object improperly read").
+func (x *ctx) markSavedByObjectVersion() {
+	if x.d.Version.R2010 {
+		return
+	}
+	app, ok := x.byName["APPID"]["ACAD"]
+	if !ok {
+		return
+	}
+	data := groupsToEED([]dxf.Group{{Code: 1000, Value: "AcDbSavedByObjectVersion"}, {Code: 1070, Value: "0"}}, x.d.Version.R2007, x.d.Text)
+	for _, o := range x.d.Objects {
+		if _, vs := o.Body.(*dwg.VisualStyle); !vs {
+			continue
+		}
+		has := false
+		for _, e := range o.EED {
+			if e.App.H == app {
+				has = true
+			}
+		}
+		if !has {
+			o.EED = append(o.EED, dwg.EED{App: dwg.Ref{Code: 5, H: app}, Data: data})
+		}
 	}
 }

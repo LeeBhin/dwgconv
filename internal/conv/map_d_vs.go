@@ -106,6 +106,10 @@ func dVisualStyleRec(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.VisualStyle) {
 	if !m.Reading() && !r2010 {
 		props = dVSLegacyProps(b.Type, b.Legacy)
 	}
+	if !m.Reading() && r2010 && len(props) < len(dwg.VSPropCodes) {
+		// R2010 stores properties 1-28; ODA writes 29-58 with the same defaults as for R2004
+		props = append(append([]dwg.VSProp(nil), props...), dVSDefaults(b.Type)...)
+	}
 	n := m.Count(70, len(props))
 	if m.Reading() {
 		props = make([]dwg.VSProp, n)
