@@ -1,6 +1,8 @@
 package dwg
 
 import (
+	"fmt"
+
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/korean"
@@ -57,7 +59,16 @@ func (t TextCodec) Encode(s string) []byte {
 	}
 	b, err := t.enc.NewEncoder().Bytes([]byte(s))
 	if err != nil {
-		b = []byte(s)
+		// characters the codepage cannot hold are written as \U+XXXX, as AutoCAD does
+		b = b[:0]
+		enc := t.enc.NewEncoder()
+		for _, r := range s {
+			if e, err := enc.Bytes([]byte(string(r))); err == nil {
+				b = append(b, e...)
+			} else {
+				b = append(b, []byte(fmt.Sprintf(`\U+%04X`, r))...)
+			}
+		}
 	}
 	return append(b, 0)
 }

@@ -14,8 +14,15 @@ import (
 	"dwgconv/internal/dxf"
 )
 
-// outVersion is the DWG version FromDXF writes.
-const outVersion = "AC1032"
+// Versions FromDXF can write, by the names users know.
+var outVersions = map[string]string{"R2004": "AC1018", "R2010": "AC1024", "R2013": "AC1027", "R2018": "AC1032"}
+
+// DefaultOutVersion is the DWG version written when none is given (as the BricsCAD export did).
+const DefaultOutVersion = "R2018"
+
+// fileMaint is the maintenance release byte (file offset 0x0B) written per version, as the
+// AutoCAD versions that introduced each format write it.
+var fileMaint = map[string]byte{"AC1018": 104, "AC1024": 6, "AC1027": 125, "AC1032": 0}
 
 // rootDictEntries maps named-object dictionary entries to header handle fields.
 var rootDictEntries = map[string]string{
@@ -31,11 +38,15 @@ var controlField = map[string]string{
 	"BLOCK_RECORD": "BlockControl",
 }
 
-// FromDXF builds an AC1032 DWG from a parsed DXF.
-func FromDXF(f *dxf.File) ([]byte, error) {
+// FromDXF builds a DWG of the given version (R2004, R2010, R2013 or R2018) from a parsed DXF.
+func FromDXF(f *dxf.File, version string) ([]byte, error) {
+	ver, ok := outVersions[strings.ToUpper(version)]
+	if !ok {
+		return nil, fmt.Errorf("unsupported output version %q (R2004, R2010, R2013, R2018)", version)
+	}
 	cp := dwg.CodepageNumber(headerString(f, "$DWGCODEPAGE"))
-	d := dwg.NewDocument(outVersion, cp)
-	x := &ctx{d: d, names: map[uint64]string{}, byName: map[string]map[string]uint64{}}
+	d := dwg.NewDocument(ver, cp)
+	x := &ctx{d: d, names: map[uint64]string{}, byName: map[string]map[string]uint64{}, outVersion: ver}
 
 	x.importClasses(f.Section("CLASSES"))
 	x.registerNames(f)
@@ -362,17 +373,22 @@ func (x *ctx) finishHeaderRefs() {
 	}
 }
 
-// prefixAC1032 is the constant part of the R2018 file header bytes 0x00-0x7F (§4.1); page
-// addresses are filled in by the container writer.
-var prefixAC1032 = func() [0x80]byte {
+// filePrefix builds the file header bytes 0x00-0x7F (§4.1) for a version; page addresses are
+// filled in by the container writer. The writing application is recorded as that version.
+func filePrefix(version string, maint byte) [0x80]byte {
 	var p [0x80]byte
-	copy(p[:], "AC1032")
+	copy(p[:], version)
+	p[0x0B] = maint
 	p[0x0C] = 3
-	p[0x11] = 33 // application version
+	app := byte(dwg.VersionCode(version))
+	p[0x11], p[0x12] = app, maint // application version / maintenance
+	p[0x16], p[0x17] = app, maint // repeated, as AutoCAD writes it
 	binary.LittleEndian.PutUint32(p[0x28:], 0x80)
-	copy(p[0x34:], []byte{0x02, 0x02, 0, 0, 0xF7, 0, 0, 0, 0xC5, 0, 0, 0, 0xC5, 0, 0, 0})
+	if version == "AC1032" {
+		copy(p[0x34:], []byte{0x02, 0x02, 0, 0, 0xF7, 0, 0, 0, 0xC5, 0, 0, 0, 0xC5, 0, 0, 0})
+	}
 	return p
-}()
+}
 
 func (x *ctx) encodeFile() ([]byte, error) {
 	d := x.d
@@ -382,13 +398,15 @@ func (x *ctx) encodeFile() ([]byte, error) {
 
 	now := julianNow()
 	hdr := x.hdr
-	hdr.HasSizeHi = true
+	maint := fileMaint[x.outVersion]
+	// R2018 always has the extra size RL; R2010/R2013 only with maintenance > 3 (§9)
+	hdr.HasSizeHi = v.R2018 || (v.R2010 && maint > 3)
 	if hdr.Vars.TDCREATE.Day == 0 {
 		hdr.Vars.TDCREATE = now
 	}
 	hdr.Vars.TDUPDATE = now
 
-	f := &container.File{Version: outVersion, Prefix: prefixAC1032}
+	f := &container.File{Version: x.outVersion, Prefix: filePrefix(x.outVersion, maint)}
 	binary.LittleEndian.PutUint16(f.Prefix[0x13:], uint16(d.Codepage))
 	copy(f.Header[:], "AcFssFcAJMB\x00")
 	binary.LittleEndian.PutUint32(f.Header[0x10:], 0x6C)
@@ -415,7 +433,7 @@ func (x *ctx) encodeFile() ([]byte, error) {
 		{"AcDb:Template", 0x7400, 2, dwg.DefaultTemplate(v, x.measurement).Encode(v)},
 		{"AcDb:Handles", 0x7400, 2, handles},
 		{"AcDb:Classes", 0x7400, 2, d.Classes.Encode(v, d.Text)},
-		{"AcDb:AuxHeader", 0x7400, 2, dwg.DefaultAuxHeader(outVersion, 0, hdr.Vars.TDCREATE, now, hdr.Vars.HANDSEED.H).Encode(v)},
+		{"AcDb:AuxHeader", 0x7400, 2, dwg.DefaultAuxHeader(x.outVersion, int32(maint), hdr.Vars.TDCREATE, now, hdr.Vars.HANDSEED.H).Encode(v)},
 		{"AcDb:Header", 0x7400, 2, hdr.Encode(v, d.Text)},
 	}
 	for i, s := range list {
