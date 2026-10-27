@@ -258,5 +258,7 @@ func Compress(src []byte) []byte {
 		}
 		out = putMatch(out, m.cb, m.dist, src[m.pos+m.cb:end])
 	}
-	return append(out, 0x11)
+	// AutoCAD ends a stream with the terminator opcode followed by two zero bytes (an empty
+	// two-byte offset), counted in the data size; AutoCAD rejects streams ending with 0x11 alone.
+	return append(out, 0x11, 0, 0)
 }

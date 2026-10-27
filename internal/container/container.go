@@ -61,6 +61,10 @@ type Section struct {
 
 // File is a parsed DWG container.
 type File struct {
+	// RawPayloads, when set, maps "section name@start offset" to a stored page payload that Write
+	// reuses instead of compressing (diagnostics: isolates the compressor from the layout).
+	RawPayloads map[string][]byte
+
 	Version  string
 	Prefix   [0x80]byte // raw bytes 0x00..0x7F (version, codepage, page addresses...)
 	Header   [0x6C]byte // decrypted file header data
@@ -173,6 +177,12 @@ func Read(raw []byte) (*File, error) {
 			if !ok {
 				return nil, fmt.Errorf("section %s: page %d missing", s.Name, num)
 			}
+			if f.RawPayloads == nil {
+				f.RawPayloads = map[string][]byte{}
+			}
+			if p, err := rawPagePayload(raw, loc.addr); err == nil {
+				f.RawPayloads[fmt.Sprintf("%s@%d", s.Name, start)] = p
+			}
 			plain, err := readDataPage(raw, loc.addr, s)
 			if err != nil {
 				return nil, fmt.Errorf("section %s page %d: %w", s.Name, num, err)
@@ -271,7 +281,13 @@ func systemPage(typ uint32, plain []byte) []byte {
 	binary.LittleEndian.PutUint32(hdr[8:], uint32(len(comp)))
 	binary.LittleEndian.PutUint32(hdr[12:], 2)
 	binary.LittleEndian.PutUint32(hdr[16:], PageChecksum(PageChecksum(0, hdr[:]), comp))
-	return append(hdr[:], comp...)
+	out := append(hdr[:], comp...)
+	// §4.3: the compressed data is followed by a second header chunk whose sizes and checksum are
+	// zero. AutoCAD rejects system pages without it.
+	var tail [20]byte
+	binary.LittleEndian.PutUint32(tail[0:], typ)
+	binary.LittleEndian.PutUint32(tail[12:], 2)
+	return append(out, tail[:]...)
 }
 
 // Write serializes the container. Prefix page addresses (preview, summary info, app info...) are recomputed.
@@ -299,7 +315,11 @@ func (f *File) Write() []byte {
 			copy(chunk, s.Data[start:])
 			payload := chunk
 			if s.Compressed == 2 {
-				payload = Compress(chunk)
+				if raw, ok := f.RawPayloads[fmt.Sprintf("%s@%d", s.Name, start)]; ok {
+					payload = raw
+				} else {
+					payload = Compress(chunk)
+				}
 			}
 			pid++
 			addr := int64(len(out))
@@ -369,7 +389,9 @@ func (f *File) Write() []byte {
 			buf = binary.LittleEndian.AppendUint32(buf, uint32(e[1]))
 		}
 		page = systemPage(pageTypePageMap, buf)
-		sz := int32(len(page) + (0x20-len(page)%0x20)%0x20)
+		// the page map extent also covers the second file header that directly follows its data
+		sz := int32(len(page) + 0x6C)
+		sz += (0x20 - sz%0x20) % 0x20
 		if sz == pmSize || iter >= 4 && sz < pmSize {
 			break // a page extent may be larger than its data (§4.6); the rest is padded below
 		}
@@ -378,11 +400,8 @@ func (f *File) Write() []byte {
 		}
 		pmSize = sz
 	}
-	out = pad(append(out, page...))
-	for int64(len(out)) < pmAddr+int64(pmSize) {
-		out = append(out, magic[:min(0x20, int(pmAddr+int64(pmSize))-len(out))]...)
-	}
-	secondHdr := int64(len(out))
+	out = append(out, page...)
+	secondHdr := int64(len(out)) // as AutoCAD writes it: right after the page map, ending the file
 
 	copy(out[0:0x80], f.Prefix[:])
 	setAddr := func(off int, name string) {
@@ -421,4 +440,14 @@ func (f *File) Write() []byte {
 	copy(out[0x80:], enc[:])
 	copy(out[0xEC:0x100], magic[0xEC:0x100])
 	return append(out, enc[:]...)
+}
+
+// rawPagePayload returns the stored (compressed) payload of a data page.
+func rawPagePayload(raw []byte, addr int64) ([]byte, error) {
+	mask := uint32(0x4164536B) ^ uint32(addr)
+	if binary.LittleEndian.Uint32(raw[addr:])^mask != pageTypeData {
+		return nil, fmt.Errorf("not a data page")
+	}
+	n := int64(binary.LittleEndian.Uint32(raw[addr+8:]) ^ mask)
+	return append([]byte(nil), raw[addr+32:addr+32+n]...), nil
 }

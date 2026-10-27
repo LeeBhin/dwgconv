@@ -424,7 +424,7 @@ func (x *ctx) encodeFile() ([]byte, error) {
 	}
 	list := []sec{
 		{"", 0x7400, 2, nil},
-		{"AcDb:AppInfo", 0x300, 1, dwg.DefaultAppInfo("dwgconv", "", "dwgconv").Encode(d.Text)},
+		{"AcDb:AppInfo", 0x300, 1, dwg.DefaultAppInfo("DELTAFlow", "", "DELTAFlow").Encode(d.Text)},
 		{"AcDb:Preview", 0x400, 1, dwg.DefaultPreview().Encode()},
 		{"AcDb:SummaryInfo", 0x100, 1, dwg.DefaultSummaryInfo(hdr.Vars.TDCREATE, now).Encode(v, d.Text)},
 		{"AcDb:RevHistory", 0x7400, 2, dwg.DefaultRevHistory().Encode()},
