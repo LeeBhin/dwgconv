@@ -3,8 +3,8 @@ package conv
 import (
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Unverified against ODA: none of these types occur in the sample drawings.

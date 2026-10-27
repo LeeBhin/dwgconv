@@ -8,9 +8,9 @@ import (
 	"os"
 	"sort"
 
-	"dwgconv/internal/conv"
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/conv"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/container"
 )
 
 func main() {

@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"dwgconv/internal/container"
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 func main() {

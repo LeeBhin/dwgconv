@@ -5,7 +5,7 @@
 package dwg
 
 import (
-	"dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/bits"
 )
 
 // Ref is a handle reference resolved to an absolute handle. Code is the reference

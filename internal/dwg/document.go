@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"dwgconv/internal/bits"
-	"dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/container"
 )
 
 // Document is a decoded drawing.

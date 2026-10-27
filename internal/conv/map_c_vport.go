@@ -5,8 +5,8 @@ import (
 	"math"
 	"reflect"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 func init() {

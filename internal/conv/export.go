@@ -4,8 +4,8 @@ import (
 	"io"
 	"reflect"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // ToDXF writes the drawing as an AC1032 ASCII DXF.

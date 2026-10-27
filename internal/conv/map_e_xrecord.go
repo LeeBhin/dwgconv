@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // XRECORD data (§20.4.104) is a byte stream of RS group code + value, the value encoded by the code's type.

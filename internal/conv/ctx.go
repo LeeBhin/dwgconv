@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // tableOf maps DWG table record type names to the DXF table name.

@@ -10,17 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/container"
 )
 
-// refDXF pairs a sample with the ODA-converted DXF of the same drawing (paths on the dev machine).
-var refDXF = map[string]string{
-	"s2": "CYGHD0001A.dxf",
-	"s3": "L1002-VD-07-04-004.dxf",
-	"s7": "[01]D-BG-09-0901.dxf",
-}
+// refDXF pairs a sample drawing (.work/orig/sN.dwg) with its ODA-converted DXF (.work/oda/sN.dxf).
+var refDXF = map[string]string{"s2": "s2.dxf", "s3": "s3.dxf", "s7": "s7.dxf"}
 
-const refDir = "C:/Users/bin/AppData/Local/Temp/claude/c--Users-bin-Desktop-delta-front-ux/514b58b9-a949-4530-bab2-c84f7342158d/scratchpad/spike/refA/"
+const refDir = "../../.work/oda/"
 
 func readDXFHeader(path string) (map[string][]string, error) {
 	f, err := os.Open(path)
@@ -57,7 +53,7 @@ var odaChanges = map[string]bool{"$TDUPDATE": true, "$TDUUPDATE": true, "$HANDSE
 
 func TestHeaderValuesAgainstODA(t *testing.T) {
 	for sample, dxf := range refDXF {
-		f, err := container.ReadFile("C:/Users/bin/Desktop/dwgconv/.work/orig/" + sample + ".dwg")
+		f, err := container.ReadFile("../../.work/orig/" + sample + ".dwg")
 		if err != nil {
 			t.Skip(err)
 		}

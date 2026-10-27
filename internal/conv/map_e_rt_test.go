@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TestERoundTrip imports every reference record of type T and exports it again (DXF -> object -> DXF).

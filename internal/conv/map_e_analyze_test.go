@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TestEAnalyze lists every export/import diff for one type across the samples (env T, N=max per category).
@@ -114,5 +114,5 @@ func eWork() string {
 	if w := os.Getenv("EWORK"); w != "" {
 		return w
 	}
-	return "C:/Users/bin/Desktop/dwgconv/.work"
+	return "../../.work"
 }

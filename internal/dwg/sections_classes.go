@@ -3,7 +3,7 @@ package dwg
 import (
 	"encoding/binary"
 
-	"dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/bits"
 )
 
 // Encode serializes the AcDb:Classes section (§10.2, §5.8):

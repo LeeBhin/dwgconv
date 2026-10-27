@@ -3,8 +3,8 @@ package conv
 import (
 	"reflect"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // mapping binds one DWG body type to its DXF record. fields describes the type-specific

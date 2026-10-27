@@ -1,8 +1,8 @@
 package conv
 
 import (
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Group B: old-style POLYLINE/VERTEX variants and LWPOLYLINE.

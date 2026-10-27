@@ -10,7 +10,7 @@ import (
 	"os"
 	"sort"
 
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 func main() {

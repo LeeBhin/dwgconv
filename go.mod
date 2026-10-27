@@ -1,4 +1,4 @@
-module dwgconv
+module github.com/LeeBhin/dwgconv
 
 go 1.27.3
 

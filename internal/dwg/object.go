@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/bits"
 )
 
 // EED is one extended entity data block (§28), kept as raw bytes.

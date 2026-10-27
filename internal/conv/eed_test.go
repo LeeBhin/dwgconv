@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TestEEDAgainstODA decodes the EED of every object in the samples and compares it with the

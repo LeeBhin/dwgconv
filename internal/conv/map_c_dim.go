@@ -3,8 +3,8 @@ package conv
 import (
 	"strconv"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // dimension type numbers in DXF group 70 (low 3 bits) per DWG fixed type.

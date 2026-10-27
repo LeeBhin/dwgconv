@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TypeCheck is the per-type result of comparing our DXF mapping with a reference DXF (ODA).

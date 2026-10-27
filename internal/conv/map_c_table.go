@@ -1,8 +1,8 @@
 package conv
 
 import (
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // ACAD_TABLE (pre-R2010 body only; R2010+ tables are not decoded). Unverified against ODA.

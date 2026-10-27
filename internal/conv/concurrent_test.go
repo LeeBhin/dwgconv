@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TestConcurrentConversions runs DWG->DXF and DXF->DWG for several drawings at once and checks each

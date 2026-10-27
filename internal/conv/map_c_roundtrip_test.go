@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // TestCMappingsRoundTrip exports synthetic group C objects to DXF and imports them back.

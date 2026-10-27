@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Group E: DXF mappings of the non-graphic objects.

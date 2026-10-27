@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // eedToGroups decodes one application's extended data (§28) into DXF 1000-1071 groups.

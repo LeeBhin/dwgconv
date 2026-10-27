@@ -1,8 +1,8 @@
 package conv
 
 import (
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // VISUALSTYLE and MATERIAL DXF records as ODA writes them (layouts inferred from the samples).

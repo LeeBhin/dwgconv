@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/container"
 )
 
 // SectionCheck is the result of a decode/re-encode round trip of one section.

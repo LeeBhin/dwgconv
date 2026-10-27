@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 // TestETableStyleRebuilt compares TABLESTYLE/CELLSTYLEMAP of an original DWG with the FromDXF output (ETS=s2).

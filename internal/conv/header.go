@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // headerRefTable is the table a name-written header reference lives in.

@@ -1,6 +1,6 @@
 package dwg
 
-import "dwgconv/internal/bits"
+import "github.com/LeeBhin/dwgconv/internal/bits"
 
 // RawBody keeps the type-specific part of an object whose layout is not decoded (classes the
 // specification does not document, e.g. AEC_*): the remaining data bits, the string stream

@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"dwgconv/internal/bits"
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 func main() {

@@ -3,8 +3,8 @@ package conv
 import (
 	"reflect"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // exportRecord writes one entity or object record (0, 5, common groups, fields, xdata).

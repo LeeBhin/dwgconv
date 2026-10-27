@@ -1,8 +1,8 @@
 package conv
 
 import (
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Unverified against ODA: no MULTILEADER or ACAD_TABLE in the samples. AutoCAD DXF reference layout.

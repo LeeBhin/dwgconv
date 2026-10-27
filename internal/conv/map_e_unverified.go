@@ -1,8 +1,8 @@
 package conv
 
 import (
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Mappings for types absent from the sample drawings, written from the AutoCAD DXF reference (unverified).

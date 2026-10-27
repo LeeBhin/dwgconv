@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/bits"
 )
 
 var (

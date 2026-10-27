@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // dDimStyle binds a DIMSTYLE record. ODA writes a variable only when it differs from the

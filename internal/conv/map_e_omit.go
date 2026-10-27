@@ -2,7 +2,7 @@ package conv
 
 import (
 
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 // Objects ODA leaves out of its DXF output (observed on the sample drawings). ODA folds round-trip

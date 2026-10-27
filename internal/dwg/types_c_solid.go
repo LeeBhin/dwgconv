@@ -3,7 +3,7 @@ package dwg
 import (
 	"bytes"
 
-	"dwgconv/internal/bits"
+	"github.com/LeeBhin/dwgconv/internal/bits"
 )
 
 func init() {

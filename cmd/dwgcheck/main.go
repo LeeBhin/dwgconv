@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 type stat struct {

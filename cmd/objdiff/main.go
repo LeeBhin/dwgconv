@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 
 func main() {

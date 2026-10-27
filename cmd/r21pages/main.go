@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/container"
 )
 
 func main() {

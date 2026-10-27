@@ -3,8 +3,8 @@ package conv
 import (
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // lineweights maps the DWG lineweight index (RC) to the DXF 370 value.

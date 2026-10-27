@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"dwgconv/internal/container"
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/container"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Versions FromDXF can write, by the names users know.

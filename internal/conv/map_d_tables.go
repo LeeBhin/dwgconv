@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"dwgconv/internal/dwg"
-	"dwgconv/internal/dxf"
+	"github.com/LeeBhin/dwgconv/internal/dwg"
+	"github.com/LeeBhin/dwgconv/internal/dxf"
 )
 
 // Symbol tables (group D): table records and their control objects (DXF "TABLE").
