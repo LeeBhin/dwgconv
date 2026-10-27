@@ -38,11 +38,12 @@ var controlField = map[string]string{
 	"BLOCK_RECORD": "BlockControl",
 }
 
-// FromDXF builds a DWG of the given version (R2004, R2010, R2013 or R2018) from a parsed DXF.
-func FromDXF(f *dxf.File, version string) ([]byte, error) {
+// FromDXF builds a DWG of the given version (R2004, R2007, R2010, R2013 or R2018) from a parsed DXF.
+// warnings lists the record types that were skipped (no mapping), as "TYPE×count".
+func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, err error) {
 	ver, ok := outVersions[strings.ToUpper(version)]
 	if !ok {
-		return nil, fmt.Errorf("unsupported output version %q (R2004, R2007, R2010, R2013, R2018)", version)
+		return nil, nil, fmt.Errorf("unsupported output version %q (R2004, R2007, R2010, R2013, R2018)", version)
 	}
 	cp := dwg.CodepageNumber(headerString(f, "$DWGCODEPAGE"))
 	d := dwg.NewDocument(ver, cp)
@@ -219,16 +220,12 @@ func FromDXF(f *dxf.File, version string) ([]byte, error) {
 			parts = append(parts, fmt.Sprintf("%s×%d", k, n))
 		}
 		sort.Strings(parts)
-		lastWarnings = parts
+		warnings = parts
 	}
-	return x.encodeFile()
+	dwgData, err = x.encodeFile()
+	return dwgData, warnings, err
 }
 
-// lastWarnings lists record types FromDXF skipped (no mapping), for diagnostics.
-var lastWarnings []string
-
-// Warnings returns the record types skipped by the last FromDXF call.
-func Warnings() []string { return lastWarnings }
 
 func headerString(f *dxf.File, name string) string {
 	if s := f.Section("HEADER"); s != nil {

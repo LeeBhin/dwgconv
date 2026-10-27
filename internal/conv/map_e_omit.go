@@ -1,7 +1,6 @@
 package conv
 
 import (
-	"sync"
 
 	"dwgconv/internal/dwg"
 )
@@ -33,24 +32,16 @@ var eEmptyXDicDropped = map[string]bool{"LAYER": true, "BLOCK_HEADER": true, "TA
 // dropping its round-trip entries.
 var eEmptiedXDicKept = map[string]bool{"ACDBSECTIONVIEWSTYLE": true, "ACDBDETAILVIEWSTYLE": true}
 
-var (
-	eOmitMu    sync.Mutex
-	eOmitCache = map[*dwg.Document]map[uint64]bool{}
-)
-
-// eODAOmits reports whether ODA leaves the object with handle h out of the DXF.
+// eODAOmits reports whether ODA leaves the object with handle h out of the DXF. The set is computed
+// once per conversion and kept in the ctx (not globally), so concurrent conversions stay separate.
 func eODAOmits(x *ctx, h uint64) bool {
-	eOmitMu.Lock()
-	defer eOmitMu.Unlock()
-	set, ok := eOmitCache[x.d]
-	if !ok {
-		set = eComputeOmitted(x.d)
-		eOmitCache[x.d] = set
+	if x.omitted == nil {
+		x.omitted = eComputeOmitted(x.d)
 	}
 	if x.d.ByHandle[h] == nil {
 		return true
 	}
-	return set[h]
+	return x.omitted[h]
 }
 
 func eDict(o *dwg.Object) *dwg.Dictionary {

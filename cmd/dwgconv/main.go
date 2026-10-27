@@ -70,11 +70,11 @@ func dxfToDWG(in, out string) error {
 	if err != nil {
 		return err
 	}
-	data, err := conv.FromDXF(f, *outVer)
+	data, warnings, err := conv.FromDXF(f, *outVer)
 	if err != nil {
 		return err
 	}
-	if w := conv.Warnings(); len(w) > 0 {
+	if w := warnings; len(w) > 0 {
 		fmt.Fprintln(os.Stderr, "skipped (no mapping):", strings.Join(w, ", "))
 	}
 	return os.WriteFile(out, data, 0o644)
