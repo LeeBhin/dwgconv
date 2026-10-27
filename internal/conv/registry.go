@@ -21,6 +21,8 @@ type mapping struct {
 	name func(o *dwg.Object) string
 	// match, when set, selects this mapping on import among those sharing a DXF name.
 	match func(r *dxf.Record) bool
+	// accept, when set, rejects a record this mapping matched but cannot import into the output.
+	accept func(x *ctx, r *dxf.Record) bool
 	// handleCode is the group code of the record handle (5, or 105 for DIMSTYLE).
 	handleCode int
 	// preHandle, when set, binds groups that precede the handle (TABLE's 2 name).

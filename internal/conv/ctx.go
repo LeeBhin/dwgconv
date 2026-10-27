@@ -25,6 +25,8 @@ type ctx struct {
 	hdr    *dwg.Header
 	// measurement is $MEASUREMENT (stored in AcDb:Template, not the header).
 	measurement int16
+	// outVersion is the DWG version being written (import only).
+	outVersion string
 	// blockOwner maps entities (and BLOCK/ENDBLK) to the block record listing them.
 	blockOwner map[uint64]uint64
 	// auxVersion/auxMaint are the drawing format of the source (AcDb:AuxHeader), written in proxies.

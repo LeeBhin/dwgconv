@@ -53,7 +53,7 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 			break
 		}
 	}
-	if mp.match != nil && !mp.match(r) {
+	if mp.match != nil && !mp.match(r) || mp.accept != nil && !mp.accept(x, r) {
 		return nil // e.g. a proxy whose data is in another DWG version: cannot be restored
 	}
 	o := &dwg.Object{Handle: r.Handle(mp.handleCode), IsEntity: entity, Body: mp.newBody(), Type: mp.dwgType}

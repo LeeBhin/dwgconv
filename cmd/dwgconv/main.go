@@ -6,6 +6,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,12 +17,15 @@ import (
 	"dwgconv/internal/dxf"
 )
 
+var outVer = flag.String("version", conv.DefaultOutVersion, "DWG version to write: R2004, R2010, R2013, R2018")
+
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: dwgconv <in.dwg|in.dxf> <out.dxf|out.dwg>")
+	flag.Parse()
+	if flag.NArg() != 2 {
+		fmt.Fprintln(os.Stderr, "usage: dwgconv [-version R2018] <in.dwg|in.dxf> <out.dxf|out.dwg>")
 		os.Exit(2)
 	}
-	in, out := os.Args[1], os.Args[2]
+	in, out := flag.Arg(0), flag.Arg(1)
 	from, to := strings.ToLower(filepath.Ext(in)), strings.ToLower(filepath.Ext(out))
 	var err error
 	switch {
@@ -66,7 +70,7 @@ func dxfToDWG(in, out string) error {
 	if err != nil {
 		return err
 	}
-	data, err := conv.FromDXF(f)
+	data, err := conv.FromDXF(f, *outVer)
 	if err != nil {
 		return err
 	}

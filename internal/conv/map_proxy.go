@@ -95,8 +95,16 @@ func init() {
 		return "ACAD_PROXY_OBJECT"
 	}
 	mp.match = func(r *dxf.Record) bool {
-		v, _ := r.Value(71)
 		c, _ := r.Value(91)
-		return (dxf.Group{Value: v}).Int() == 33 && (dxf.Group{Value: c}).Int() >= 500
+		return (dxf.Group{Value: c}).Int() >= 500
+	}
+	// the data bits are in the drawing format named by 71; only restorable into that same version
+	mp.accept = func(x *ctx, r *dxf.Record) bool {
+		v, _ := r.Value(71)
+		target := x.outVersion
+		if target == "" && x.d.File != nil { // checking against a decoded drawing
+			target = x.d.File.Version
+		}
+		return int((dxf.Group{Value: v}).Int()) == dwg.VersionCode(target)
 	}
 }
