@@ -17,7 +17,7 @@ import (
 	"dwgconv/internal/dxf"
 )
 
-var outVer = flag.String("version", conv.DefaultOutVersion, "DWG version to write: R2004, R2010, R2013, R2018")
+var outVer = flag.String("version", conv.DefaultOutVersion, "DWG version to write: R2004, R2007, R2010, R2013, R2018")
 
 func main() {
 	flag.Parse()

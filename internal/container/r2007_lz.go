@@ -122,26 +122,8 @@ func r21LiteralLength(src []byte, si *int, op byte) int {
 }
 
 // r21Instructions decodes a back-reference instruction (§5.10.2).
-// r21OpStats counts instruction forms seen by the decoder (diagnostics).
-var r21OpStats map[string]int
-
 func r21Instructions(src []byte, si *int, op *byte) (offset, length int) {
 	o := *op
-	if r21OpStats != nil {
-		k := "default"
-		switch o >> 4 {
-		case 0:
-			k = "0x0X"
-		case 1:
-			k = "0x1X"
-		case 2:
-			k = "0x2X"
-			if o&8 != 0 {
-				k = "0x2X-long"
-			}
-		}
-		r21OpStats[k]++
-	}
 	switch o >> 4 {
 	case 0:
 		length = int(o&0xF) + 0x13
@@ -185,9 +167,6 @@ func r21Instructions(src []byte, si *int, op *byte) (offset, length int) {
 	return
 }
 
-// r21Trace, when set, receives each decoding step (diagnostics).
-var r21Trace func(string)
-
 // Decompress21 inflates an R2007 compressed stream into outSize bytes.
 func Decompress21(src []byte, outSize int) (out []byte, err error) {
 	defer func() {
@@ -210,9 +189,6 @@ func Decompress21(src []byte, outSize int) (out []byte, err error) {
 			si++
 			length = r21LiteralLength(src, &si, op)
 		}
-		if r21Trace != nil {
-			r21Trace(fmt.Sprintf("@%d out=%d LIT %d % x", si, len(out), length, src[si:si+length]))
-		}
 		out = copyLiteral(out, src[si:], length)
 		si += length
 		length = 0
@@ -224,9 +200,6 @@ func Decompress21(src []byte, outSize int) (out []byte, err error) {
 		si++
 		offset, n := r21Instructions(src, &si, &op)
 		for {
-			if r21Trace != nil {
-				r21Trace(fmt.Sprintf("@%d out=%d REF off=%d len=%d", si, len(out), offset, n))
-			}
 			s := len(out) - offset
 			if s < 0 {
 				return nil, fmt.Errorf("lz21: back reference before start")

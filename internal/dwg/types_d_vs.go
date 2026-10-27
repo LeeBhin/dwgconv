@@ -119,7 +119,7 @@ type VisualStyle struct {
 	Props    []VSProp
 	Legacy   *VSLegacy
 	// Unknown2007 is a value only R2007 files store after the legacy fields.
-	Unknown2007 byte `conv:"derived"`
+	Unknown2007 int16 `conv:"derived"`
 }
 
 func (b *VisualStyle) data(c *codec, o *Object) {
@@ -131,7 +131,7 @@ func (b *VisualStyle) data(c *codec, o *Object) {
 		}
 		b.Legacy.code(c)
 		if c.R2007 {
-			c.BB(&b.Unknown2007) // R2007 only: two more bits before Internal (observed; meaning unknown)
+			c.BS(&b.Unknown2007) // R2007 only: one more BS before Internal, 0 in the samples (observed)
 		}
 		c.B(&b.Internal)
 		return

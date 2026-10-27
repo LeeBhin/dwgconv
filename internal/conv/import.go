@@ -15,14 +15,14 @@ import (
 )
 
 // Versions FromDXF can write, by the names users know.
-var outVersions = map[string]string{"R2004": "AC1018", "R2010": "AC1024", "R2013": "AC1027", "R2018": "AC1032"}
+var outVersions = map[string]string{"R2004": "AC1018", "R2007": "AC1021", "R2010": "AC1024", "R2013": "AC1027", "R2018": "AC1032"}
 
 // DefaultOutVersion is the DWG version written when none is given (as the BricsCAD export did).
 const DefaultOutVersion = "R2018"
 
 // fileMaint is the maintenance release byte (file offset 0x0B) written per version, as the
 // AutoCAD versions that introduced each format write it.
-var fileMaint = map[string]byte{"AC1018": 104, "AC1024": 6, "AC1027": 125, "AC1032": 0}
+var fileMaint = map[string]byte{"AC1018": 104, "AC1021": 50, "AC1024": 6, "AC1027": 125, "AC1032": 0}
 
 // rootDictEntries maps named-object dictionary entries to header handle fields.
 var rootDictEntries = map[string]string{
@@ -42,7 +42,7 @@ var controlField = map[string]string{
 func FromDXF(f *dxf.File, version string) ([]byte, error) {
 	ver, ok := outVersions[strings.ToUpper(version)]
 	if !ok {
-		return nil, fmt.Errorf("unsupported output version %q (R2004, R2010, R2013, R2018)", version)
+		return nil, fmt.Errorf("unsupported output version %q (R2004, R2007, R2010, R2013, R2018)", version)
 	}
 	cp := dwg.CodepageNumber(headerString(f, "$DWGCODEPAGE"))
 	d := dwg.NewDocument(ver, cp)
