@@ -56,3 +56,7 @@ dwgBytes, warnings, err := dwgconv.DXFToDWG(dxfReader, "R2018") // "" = R2018
 | `internal/conv` | DWG ↔ DXF 매핑과 문서 조립 |
 
 DWG 와 DXF 는 Autodesk, Inc. 의 상표입니다. 이 프로젝트는 Autodesk 및 Open Design Alliance 와 관계가 없습니다.
+
+## 라이선스
+
+MIT — [LICENSE](LICENSE).
