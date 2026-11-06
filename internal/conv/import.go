@@ -76,6 +76,12 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 			warn = append(warn, r.Type)
 			return nil
 		}
+		// ACAD_TABLE is decoded only in the pre-R2010 layout; R2010+ output needs TABLECONTENT,
+		// which is not encoded — leave the table out (its *T block stays) instead of failing the file.
+		if _, ok := o.Body.(*dwg.Table); ok && d.Version.R2010 {
+			warn = append(warn, r.Type+"(R2010+ table)")
+			return nil
+		}
 		// types with a fixed number keep it (AutoCAD writes LAYOUT, LWPOLYLINE, XRECORD... that way);
 		// the class number is used only for class-only types
 		if o.Type == 0 {

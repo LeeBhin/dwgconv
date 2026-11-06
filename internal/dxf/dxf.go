@@ -82,7 +82,7 @@ func Parse(r io.Reader) (*File, error) {
 		if err != nil {
 			return Group{}, fmt.Errorf("dxf: line %d: bad group code %q", line-1, c)
 		}
-		return Group{code, strings.TrimRight(v, "\r\n")}, nil
+		return Group{code, decodeCaret(strings.TrimRight(v, "\r\n"))}, nil
 	}
 	f := &File{}
 	var sec *Section
@@ -146,7 +146,55 @@ func (w *Writer) raw(code int, value string) {
 	if w.err != nil {
 		return
 	}
-	_, w.err = fmt.Fprintf(w.w, "%3d\r\n%s\r\n", code, value)
+	_, w.err = fmt.Fprintf(w.w, "%3d\r\n%s\r\n", code, encodeCaret(value))
+}
+
+// encodeCaret writes control characters in caret notation like AutoCAD (newline → ^J; TOLERANCE
+// text keeps its line break this way) — a raw newline would split the value and shift every
+// following group. A literal ^ becomes "^ " only where it would otherwise read as a control
+// character, so MTEXT stacks such as \S1^2; stay as they are.
+func encodeCaret(s string) string {
+	if !strings.ContainsFunc(s, func(r rune) bool { return r < 0x20 || r == '^' }) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c < 0x20:
+			b.WriteByte('^')
+			b.WriteByte(c + 0x40)
+		case c == '^' && i+1 < len(s) && (s[i+1] == ' ' || s[i+1] >= 0x40 && s[i+1] <= 0x5F):
+			b.WriteString("^ ")
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// decodeCaret undoes encodeCaret: "^ " is a caret, ^@ … ^_ are control characters, anything else
+// is left as written.
+func decodeCaret(s string) string {
+	if !strings.Contains(s, "^") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '^' && i+1 < len(s) {
+			if n := s[i+1]; n == ' ' {
+				b.WriteByte('^')
+				i++
+				continue
+			} else if n >= 0x40 && n <= 0x5F {
+				b.WriteByte(n - 0x40)
+				i++
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 func (w *Writer) Str(code int, s string) {
