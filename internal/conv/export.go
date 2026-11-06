@@ -45,6 +45,7 @@ func ToDXF(d *dwg.Document, out io.Writer) error {
 	x.exportBlocks(w)
 	x.exportEntities(w)
 	x.exportObjects(w)
+	x.exportAcds(w)
 	w.Str(0, "EOF")
 	return w.Flush()
 }
@@ -95,7 +96,7 @@ func controlEntries(ctl *dwg.Object) []dwg.Ref {
 	if !ok {
 		return nil
 	}
-	if ctl.Type == 0x30 { // BLOCK_CONTROL: *Model_Space, *Paper_Space, then the rest
+	if ctl.Type == 0x30 || ctl.Type == 0x38 { // BLOCK: *Model_Space, *Paper_Space / LTYPE: ByBlock, ByLayer, then the rest
 		return append(append([]dwg.Ref(nil), tc.Special...), tc.Entries...)
 	}
 	return tc.Entries

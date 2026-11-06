@@ -9,7 +9,7 @@ foreach ($File in $Files) {
     $p = Start-Process $exe -ArgumentList "/nologo", "`"$File`"" -PassThru
     $ws = New-Object -ComObject WScript.Shell
     for ($k = 0; $k -lt 2; $k++) {
-        for ($i = 0; $i -lt 30; $i++) { Start-Sleep 2; if ($ws.AppActivate("Open Drawing - Damaged File")) { break } }
+        for ($i = 0; $i -lt 30; $i++) { Start-Sleep 2; if ($ws.AppActivate("Open Drawing - Damaged File") -or $ws.AppActivate("Open Drawing - Errors Found")) { break } }
         Start-Sleep 1; $ws.SendKeys("{ENTER}")
     }
     Start-Sleep 3

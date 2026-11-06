@@ -66,6 +66,7 @@ func (x *ctx) importRecord(r *dxf.Record, entity bool) *dwg.Object {
 	if entity {
 		o.Ent = &dwg.EntityCommon{}
 		x.entityCommon(m, o)
+		fixNullRefs(reflect.ValueOf(o.Ent)) // e.g. plot style flags 3 with a null handle (390 = 0) — code 0 is rejected
 	} else {
 		owner := uint64(0)
 		x.ownership(m, o, &owner)

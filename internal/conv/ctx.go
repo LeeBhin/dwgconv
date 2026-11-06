@@ -33,6 +33,10 @@ type ctx struct {
 	blockOwner map[uint64]uint64
 	// auxVersion/auxMaint are the drawing format of the source (AcDb:AuxHeader), written in proxies.
 	auxVersion, auxMaint int
+	// asm is the binary ACIS data of the DXF's ACDSDATA section by entity handle (import);
+	// asmOut collects the entities' binary ACIS data for that section (export).
+	asm    map[uint64][]byte
+	asmOut []asmRecord
 }
 
 func newCtx(d *dwg.Document) *ctx {
@@ -178,7 +182,11 @@ func (x *ctx) numberBlockNames() {
 		return
 	}
 	paper := 0
-	for i, r := range controlEntries(ctl) {
+	live := -1 // position among the entries that exist (as dAnonName counts); specials come first
+	for _, r := range controlEntries(ctl) {
+		if x.d.ByHandle[r.H] != nil {
+			live++
+		}
 		name, ok := x.names[r.H]
 		if !ok {
 			continue
@@ -191,7 +199,7 @@ func (x *ctx) numberBlockNames() {
 			}
 			paper++
 		case isAnonymousBase(name):
-			x.addName("BLOCK_RECORD", fmt.Sprintf("%s%d", name, i-2), r.H)
+			x.addName("BLOCK_RECORD", fmt.Sprintf("%s%d", name, live-2), r.H)
 		}
 	}
 }

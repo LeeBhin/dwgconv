@@ -94,9 +94,13 @@ func init() {
 		}
 		return "ACAD_PROXY_OBJECT"
 	}
+	// entities are written under this name too; the raw form is told from a genuine AcDbProxyEntity
+	// (92/93 graphics and data) by the bit count group 161
+	byDXFName["ACAD_PROXY_ENTITY"] = append(byDXFName["ACAD_PROXY_ENTITY"], mp)
 	mp.match = func(r *dxf.Record) bool {
 		c, _ := r.Value(91)
-		return (dxf.Group{Value: c}).Int() >= 500
+		_, raw := r.Value(161)
+		return raw && (dxf.Group{Value: c}).Int() >= 500
 	}
 	// the data bits are in the drawing format named by 71; only restorable into that same version
 	mp.accept = func(x *ctx, r *dxf.Record) bool {

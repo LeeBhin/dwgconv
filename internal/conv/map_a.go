@@ -30,7 +30,12 @@ func init() {
 				hdr = bh
 			}
 		}
-		name := b.Name
+		// the record's DXF name (numbered anonymous names come from the block table position, as
+		// ODA writes them); the BLOCK entity's own stored name can carry a stale number ("*D4")
+		name := x.names[o.Owner.H]
+		if name == "" {
+			name = b.Name
+		}
 		if name == "" {
 			name = hdr.Name
 		}
@@ -47,8 +52,9 @@ func init() {
 		m.Str(1, &path)
 		if m.Reading() {
 			b.Name = name
-			// The BLOCK_RECORD owner carries these values in DWG.
-			hdr.Name, hdr.BasePoint, hdr.XrefPath = name, base, path
+			// The BLOCK_RECORD owner carries these values in DWG; the record keeps the unnumbered
+			// anonymous name ("*D3" -> "*D"), as the table import stores it.
+			hdr.Name, hdr.BasePoint, hdr.XrefPath = dwgBlockName(name), base, path
 			hdr.Anonymous = flags&1 != 0
 			hdr.HasAttribs = flags&2 != 0
 			hdr.IsXref = flags&4 != 0

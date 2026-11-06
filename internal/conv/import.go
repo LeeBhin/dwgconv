@@ -53,6 +53,7 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 
 	x.importClasses(f.Section("CLASSES"))
 	x.registerNames(f)
+	x.importAcds(f)
 	mleaderApp := x.reserveMLeaderVerApp(f)
 	x.hdr = x.importHeader(f.Section("HEADER"))
 	x.measurement = 1

@@ -26,12 +26,18 @@ func init() {
 	register("ACAD_PROXY_ENTITY", 0x1F2, cProxyEntity)
 }
 
-// cAcis binds AcDbModelerGeometry: version 70 then the SAT text as 1 (with 3 continuations).
+// cAcis binds AcDbModelerGeometry: SAT text (version 1) as 70 then 1 (with 3 continuations);
+// binary SAB (version 2) as 290 + GUID with the bytes in the ACDSDATA section (see acds.go).
 func cAcis(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Acis) {
 	m.Subclass("AcDbModelerGeometry")
-	ver := int16(1)
-	m.Int16(70, &ver)
-	if !m.Reading() {
+	if !m.Reading() && !b.Empty && b.Version == 2 && len(b.Data.File) > 0 {
+		w := m.Writer()
+		w.Int(290, 0)
+		w.Str(2, "{00000000-0000-0000-0000-000000000000}")
+		x.asmOut = append(x.asmOut, asmRecord{o.Handle, b.Data.File})
+	} else if !m.Reading() {
+		ver := int16(1)
+		m.Int16(70, &ver)
 		if !b.Empty && b.Version == 1 {
 			for _, line := range strings.Split(strings.TrimRight(string(b.Data.SAT()), "\n"), "\n") {
 				first := true
@@ -68,6 +74,9 @@ func cAcis(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Acis) {
 			b.Version = 1
 			b.Empty2 = true
 			b.Data = dwg.AcisData{Blocks: [][]byte{cEncodeSAT(sat.String() + "\n")}}
+		} else if data := x.asm[o.Handle]; len(data) > 0 {
+			b.Empty, b.Version, b.Empty2 = false, 2, true
+			b.Data = dwg.AcisData{File: data}
 		}
 	}
 	if o.Type == 0x26 && x.d.Version.R2007 {
