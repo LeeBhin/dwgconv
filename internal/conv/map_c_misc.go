@@ -1,6 +1,8 @@
 package conv
 
 import (
+	"crypto/rand"
+	"fmt"
 	"strings"
 
 	"github.com/LeeBhin/dwgconv/internal/dwg"
@@ -32,8 +34,9 @@ func cAcis(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Acis) {
 	m.Subclass("AcDbModelerGeometry")
 	if !m.Reading() && !b.Empty && b.Version == 2 && len(b.Data.File) > 0 {
 		w := m.Writer()
-		w.Int(290, 0)
-		w.Str(2, "{00000000-0000-0000-0000-000000000000}")
+		has := b.GUID != [16]byte{}
+		w.Int(290, map[bool]int64{false: 0, true: 1}[has])
+		w.Str(2, formatGUID(b.GUID))
 		x.asmOut = append(x.asmOut, asmRecord{o.Handle, b.Data.File})
 	} else if !m.Reading() {
 		ver := int16(1)
@@ -77,6 +80,18 @@ func cAcis(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Acis) {
 		} else if data := x.asm[o.Handle]; len(data) > 0 {
 			b.Empty, b.Version, b.Empty2 = false, 2, true
 			b.Data = dwg.AcisData{File: data}
+			if x.d.Version.R2013 {
+				// R2013+ object: revision GUID from the DXF (a new one when absent) and the two values
+				// ODA writes around it; the SAB itself goes to the AcDs section (see encodeFile)
+				var gs string
+				m.Str(2, &gs)
+				if g, ok := parseGUID(gs); ok && g != [16]byte{} {
+					b.GUID = g
+				} else {
+					b.GUID = newGUID()
+				}
+				b.Unknown, b.Flags2013, b.Tail2013 = true, 0x40|b.GUID[0]&0x0F, 2
+			}
 		}
 		if !b.Empty {
 			// AutoCAD always writes the wireframe block (no point, $ISOLINES, empty wire/silhouette
@@ -188,4 +203,33 @@ func cProxyEntity(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.ProxyEntity) {
 		o.Ent.Graphic, o.Ent.HasGraphic = g, len(g) > 0
 		b.DataBits, b.NDataBits = data, int(nb)
 	}
+}
+
+// formatGUID writes the 16 stored bytes (mixed-endian: Data1-3 little-endian) as {8-4-4-4-12}.
+func formatGUID(g [16]byte) string {
+	return fmt.Sprintf("{%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x}",
+		g[3], g[2], g[1], g[0], g[5], g[4], g[7], g[6], g[8], g[9], g[10], g[11], g[12], g[13], g[14], g[15])
+}
+
+// parseGUID is the inverse of formatGUID; braces are optional.
+func parseGUID(s string) ([16]byte, bool) {
+	var g [16]byte
+	s = strings.Trim(strings.TrimSpace(s), "{}")
+	var hex [16]byte
+	n, err := fmt.Sscanf(s, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		&hex[0], &hex[1], &hex[2], &hex[3], &hex[4], &hex[5], &hex[6], &hex[7], &hex[8], &hex[9], &hex[10], &hex[11], &hex[12], &hex[13], &hex[14], &hex[15])
+	if err != nil || n != 16 {
+		return g, false
+	}
+	g = [16]byte{hex[3], hex[2], hex[1], hex[0], hex[5], hex[4], hex[7], hex[6], hex[8], hex[9], hex[10], hex[11], hex[12], hex[13], hex[14], hex[15]}
+	return g, true
+}
+
+// newGUID returns a random version-4 GUID in the stored byte order.
+func newGUID() [16]byte {
+	var g [16]byte
+	_, _ = rand.Read(g[:])
+	g[7] = g[7]&0x0F | 0x40 // version 4 (Data3 high byte in little-endian order)
+	g[8] = g[8]&0x3F | 0x80 // variant
+	return g
 }

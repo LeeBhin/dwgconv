@@ -152,9 +152,29 @@ type Acis struct {
 	Data2           AcisData
 	Unknown2007     int32
 	HistoryID       Ref // 350, R2007+
+	// R2013+: the SAB is in the AcDs section (Data.File is filled from it on load, see Document);
+	// the object keeps a revision GUID (DXF 2, mixed-endian bytes) between two undocumented values
+	// (ODA writes 0x40|n and 2).
+	GUID      [16]byte `conv:"derived"`
+	Flags2013 byte     `conv:"derived"`
+	Tail2013  byte     `conv:"derived"`
 }
 
 func (b *Acis) data(c *codec, o *Object) {
+	if c.R2013 {
+		// ODA R2013/R2018 files, checked against 12 objects: B 0, B 1, RC 0x4?, 16 GUID bytes, BB 2.
+		c.B(&b.Empty)
+		if b.Empty {
+			return
+		}
+		c.B(&b.Unknown)
+		c.RC(&b.Flags2013)
+		g := b.GUID[:]
+		c.Raw(&g, 16)
+		copy(b.GUID[:], g)
+		c.BB(&b.Tail2013)
+		return
+	}
 	c.B(&b.Empty)
 	if !b.Empty {
 		c.B(&b.Unknown)

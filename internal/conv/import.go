@@ -482,6 +482,20 @@ func (x *ctx) encodeFile() ([]byte, error) {
 	}
 	list := []sec{
 		{"", 0x7400, 2, nil},
+	}
+	if v.R2013 {
+		// solids keep their SAB in the AcDs data store from R2013 on
+		var recs []dwg.AcDsRecord
+		for _, o := range d.Objects {
+			if a, ok := o.Body.(*dwg.Acis); ok && !a.Empty && a.Version == 2 && len(a.Data.File) > 0 {
+				recs = append(recs, dwg.AcDsRecord{Handle: o.Handle, Data: a.Data.File})
+			}
+		}
+		if len(recs) > 0 {
+			list = append(list, sec{"AcDb:AcDsPrototype_1b", 0x7400, 2, dwg.BuildAcDs(recs)})
+		}
+	}
+	list = append(list, []sec{
 		{"AcDb:AppInfo", 0x300, 1, dwg.DefaultAppInfo("DELTAFlow", "", "DELTAFlow").Encode(d.Text)},
 		{"AcDb:Preview", 0x400, 1, dwg.DefaultPreview().Encode()},
 		{"AcDb:SummaryInfo", 0x100, 1, dwg.DefaultSummaryInfo(hdr.Vars.TDCREATE, now).Encode(v, d.Text)},
@@ -493,7 +507,7 @@ func (x *ctx) encodeFile() ([]byte, error) {
 		{"AcDb:Classes", 0x7400, 2, d.Classes.Encode(v, d.Text)},
 		{"AcDb:AuxHeader", 0x7400, 2, dwg.DefaultAuxHeader(x.outVersion, int32(maint), hdr.Vars.TDCREATE, now, hdr.Vars.HANDSEED.H).Encode(v)},
 		{"AcDb:Header", 0x7400, 2, hdr.Encode(v, d.Text)},
-	}
+	}...)
 	for i, s := range list {
 		id := int32(0)
 		if i > 0 {

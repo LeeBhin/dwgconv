@@ -95,6 +95,18 @@ func Decode(f *container.File) (*Document, error) {
 		d.Objects = append(d.Objects, o)
 		d.ByHandle[o.Handle] = o
 	}
+	if sec := f.Section("AcDb:AcDsPrototype_1b"); sec != nil && d.Version.R2013 {
+		// R2013+: the SAB of each solid is stored here by handle, not in the object
+		if m, err := ParseAcDs(sec.Data); err == nil {
+			for h, data := range m {
+				if o := d.ByHandle[h]; o != nil {
+					if a, ok := o.Body.(*Acis); ok {
+						a.Data, a.Version, a.Empty = AcisData{File: data}, 2, false
+					}
+				}
+			}
+		}
+	}
 	return d, nil
 }
 

@@ -64,6 +64,9 @@ func TestCTypesRoundTrip(t *testing.T) {
 		if v.R2007 {
 			ac.HistoryID = Ref{5, 0x40}
 		}
+		if v.R2013 { // R2013+: only the revision GUID is in the object, the SAB is in the AcDs section
+			ac = &Acis{Unknown: true, Flags2013: 0x4A, GUID: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Tail2013: 2}
+		}
 		cRoundTrip(t, ver, 0x26, ac, func() Body { return &Acis{} })
 
 		px := &ProxyEntity{ClassID: 499, OrigDXF: false, DataBits: []byte{0xAB, 0xC0}, NDataBits: 10,
