@@ -137,7 +137,9 @@ func (w *Writer) BLL(v uint64) {
 			panic("bits: BLL too large")
 		}
 	}
-	w.B3(byte(n))
+	w.Bool(n&4 != 0) // fixed 3-bit byte count
+	w.Bool(n&2 != 0)
+	w.Bool(n&1 != 0)
 	for i := 0; i < n; i++ {
 		w.RC(byte(v >> (8 * uint(i))))
 	}

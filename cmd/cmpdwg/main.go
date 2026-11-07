@@ -26,7 +26,10 @@ func main() {
 	for _, t := range os.Args[3:] {
 		only[t] = true
 	}
-	type st struct{ both, same, onlyA int; first uint64 }
+	type st struct {
+		both, same, onlyA int
+		first             uint64
+	}
 	res := map[string]*st{}
 	for _, oa := range a.Objects {
 		n := oa.TypeName(a.Classes.Classes)

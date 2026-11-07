@@ -79,6 +79,7 @@ type AcisData struct {
 }
 
 var sabEnd = []byte("End\x0E\x02of\x0E\x04ACIS\x0D\x04data")
+var asmEnd = []byte("End\x0E\x02of\x0E\x03ASM\x0D\x04data") // ASM-based SAB (AutoCAD 2013+, ODA)
 var satEnd = []byte("End-of-ACIS-data")
 
 func (a *AcisData) code(c *codec, version int16) {
@@ -110,7 +111,7 @@ func (a *AcisData) code(c *codec, version int16) {
 	var buf []byte
 	for {
 		buf = append(buf, c.dat.RC())
-		if bytes.HasSuffix(buf, sabEnd) || bytes.HasSuffix(buf, satEnd) {
+		if bytes.HasSuffix(buf, sabEnd) || bytes.HasSuffix(buf, asmEnd) || bytes.HasSuffix(buf, satEnd) {
 			a.File = buf
 			return
 		}
@@ -159,6 +160,12 @@ func (b *Acis) data(c *codec, o *Object) {
 		c.B(&b.Unknown)
 		c.BS(&b.Version)
 		b.Data.code(c, b.Version)
+		if !c.w && c.dat.Remaining() == 0 {
+			return // ODA writes nothing after the SAB (no wireframe block); AutoCAD and ODA read that
+		}
+		// Wireframe block (§20.4.41). The wire/silhouette lists, the second "ACIS empty" bit and the
+		// R2007+ BL are nested in it: ODA writes nothing after "wireframe present" = 0, and AutoCAD
+		// rejects an object that has the empty bit with "isolines present" = 0.
 		c.B(&b.Wireframe)
 		if b.Wireframe {
 			c.B(&b.PointPresent)
@@ -167,31 +174,36 @@ func (b *Acis) data(c *codec, o *Object) {
 			}
 			c.BL(&b.NumIsolines)
 			c.B(&b.IsolinesPresent)
-			b.Wires = cWires(c, b.Wires)
-			n := c.BLCount(len(b.Silhouettes))
-			b.Silhouettes = Slice(c, b.Silhouettes, n)
-			for i := range b.Silhouettes {
-				s := &b.Silhouettes[i]
-				c.BL(&s.VPID)
-				c.BD3(&s.Target)
-				c.BD3(&s.Dir)
-				c.BD3(&s.Up)
-				c.B(&s.Perspective)
-				s.Wires = cWires(c, s.Wires)
+			if b.IsolinesPresent {
+				b.Wires = cWires(c, b.Wires)
+				n := c.BLCount(len(b.Silhouettes))
+				b.Silhouettes = Slice(c, b.Silhouettes, n)
+				for i := range b.Silhouettes {
+					s := &b.Silhouettes[i]
+					c.BL(&s.VPID)
+					c.BD3(&s.Target)
+					c.BD3(&s.Dir)
+					c.BD3(&s.Up)
+					c.B(&s.Perspective)
+					s.Wires = cWires(c, s.Wires)
+				}
+				if !c.w && c.dat.Remaining() == 0 {
+					return
+				}
+				c.B(&b.Empty2)
+				if !b.Empty2 {
+					b.Data2.code(c, b.Version)
+				}
+				if c.R2007 && !(!c.w && c.dat.Remaining() == 0) {
+					c.BL(&b.Unknown2007)
+				}
 			}
 		}
-		c.B(&b.Empty2)
-		if !b.Empty2 {
-			b.Data2.code(c, b.Version)
-		}
-	}
-	if c.R2007 {
-		c.BL(&b.Unknown2007)
 	}
 }
 
 func (b *Acis) handles(c *codec, o *Object) {
-	if c.R2007 {
+	if c.R2007 && o.Type == 0x26 { // 3DSOLID only: REGION and BODY have no history object
 		c.H(&b.HistoryID)
 	}
 }

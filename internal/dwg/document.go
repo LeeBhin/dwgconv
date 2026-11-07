@@ -129,6 +129,9 @@ func (d *Document) decodeObject(buf []byte, off int) *Object {
 			mk = func() Body { return &RawBody{} }
 		}
 		b := mk()
+		if keepBadBodies {
+			o.Body = b // visible even when data() fails below
+		}
 		b.data(c, o)
 		o.codeCommonHandles(c)
 		b.handles(c, o)
@@ -140,7 +143,9 @@ func (d *Document) decodeObject(buf []byte, off int) *Object {
 		}
 	})
 	if err != nil {
-		o.Body = nil
+		if !keepBadBodies { // diagnostics: DWGCONV_KEEPBAD=1 keeps the partially decoded body
+			o.Body = nil
+		}
 		o.DecodeErr = err
 	}
 	o.StrFlag = d.Version.R2007 && c.str != c.dat
@@ -237,6 +242,9 @@ func (d *Document) Add(o *Object) {
 // VersionCode is the numeric DWG version (§27): 25 R2004, 27 R2007, 29 R2010, 31 R2013, 33 R2018.
 func VersionCode(version string) int { return int(auxVersionCodes[version]) }
 
+// keepBadBodies (DWGCONV_KEEPBAD=1) keeps the partially decoded body of an object whose decode failed.
+var keepBadBodies = os.Getenv("DWGCONV_KEEPBAD") != ""
+
 // rawClasses (DWGCONV_RAW=NAME,NAME) keeps the named classes undecoded, for layout analysis.
 var rawClasses = func() map[string]bool {
 	m := map[string]bool{}
@@ -247,3 +255,43 @@ var rawClasses = func() map[string]bool {
 	}
 	return m
 }()
+
+// BodyBits re-reads an object and returns its data bits after the common entity/object data and
+// its handle bits, as 0/1 strings (diagnostics for undocumented layouts).
+func (d *Document) BodyBits(o *Object) (data, handles string, err error) {
+	sec := d.File.Section("AcDb:AcDbObjects")
+	off := -1
+	p := len(d.objPrefix)
+	for _, q := range d.Objects {
+		if q == o {
+			off = p
+			break
+		}
+		p += len(q.Raw)
+	}
+	if off < 0 {
+		return "", "", fmt.Errorf("object not found")
+	}
+	c, _, _, err := splitObject(sec.Data, off, d.Version)
+	if err != nil {
+		return "", "", err
+	}
+	c.text = d.Text
+	tmp := &Object{Handle: o.Handle, Type: o.Type, IsEntity: o.IsEntity}
+	if tmp.IsEntity {
+		tmp.Ent = &EntityCommon{}
+	}
+	err = catch(func() { tmp.decodeCommon(c) })
+	bitsOf := func(r *bits.Reader) string {
+		var sb strings.Builder
+		for r.Remaining() > 0 {
+			if r.Bool() {
+				sb.WriteByte('1')
+			} else {
+				sb.WriteByte('0')
+			}
+		}
+		return sb.String()
+	}
+	return bitsOf(c.dat), bitsOf(c.hdl), err
+}

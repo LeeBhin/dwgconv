@@ -113,7 +113,8 @@ func (r *Reader) BL() int32 {
 
 // BLL bitlonglong (§2.4).
 func (r *Reader) BLL() uint64 {
-	n := int(r.B3())
+	// the byte count is a fixed 3-bit field (not the 1-3 bit "3B" code): 010 = 2 bytes
+	n := int(r.B())<<2 | int(r.B())<<1 | int(r.B())
 	var v uint64
 	for i := 0; i < n; i++ {
 		v |= uint64(r.RC()) << (8 * i)

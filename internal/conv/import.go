@@ -2,11 +2,11 @@ package conv
 
 import (
 	"encoding/binary"
-	"strconv"
-	"os"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -265,7 +265,6 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 	dwgData, err = x.encodeFile()
 	return dwgData, warnings, err
 }
-
 
 func headerString(f *dxf.File, name string) string {
 	if s := f.Section("HEADER"); s != nil {
@@ -552,12 +551,12 @@ func (x *ctx) markSavedByObjectVersion() {
 	}
 }
 
-// reserveMLeaderVerApp: R2007 MLEADERSTYLEs must carry the ACAD_MLEADERVER marker xdata (AutoCAD
+// reserveMLeaderVerApp: pre-R2010 MLEADERSTYLEs must carry the ACAD_MLEADERVER marker xdata (AutoCAD
 // rejects the old layout there; ODA attaches it too). When the DXF has MLEADERSTYLEs but no such
 // APPID, a handle is reserved for a new one and its name registered (the mapping then attaches
 // the xdata). Returns the reserved handle, or 0.
 func (x *ctx) reserveMLeaderVerApp(f *dxf.File) uint64 {
-	if x.outVersion != "AC1021" {
+	if x.d.Version.R2010 { // every pre-R2010 file: AutoCAD writes the marker when saving R2004 too
 		return 0
 	}
 	if _, ok := x.byName["APPID"]["ACAD_MLEADERVER"]; ok {
@@ -567,7 +566,7 @@ func (x *ctx) reserveMLeaderVerApp(f *dxf.File) uint64 {
 	has := false
 	for _, s := range f.Sections {
 		for _, r := range s.Records {
-			if r.Type == "MLEADERSTYLE" {
+			if r.Type == "MLEADERSTYLE" || r.Type == "MULTILEADER" {
 				has = true
 			}
 			for _, c := range []int{5, 105} {

@@ -78,6 +78,16 @@ func cAcis(m *dxf.Mapper, x *ctx, o *dwg.Object, b *dwg.Acis) {
 			b.Empty, b.Version, b.Empty2 = false, 2, true
 			b.Data = dwg.AcisData{File: data}
 		}
+		if !b.Empty {
+			// AutoCAD always writes the wireframe block (no point, $ISOLINES, empty wire/silhouette
+			// lists); with "wireframe present" or "isolines present" false AutoCAD discards the
+			// object (eDwgObjectImproperlyRead) and ODA warns.
+			b.Wireframe, b.PointPresent, b.IsolinesPresent = true, false, true
+			b.NumIsolines = 4
+			if x.hdr != nil && x.hdr.Vars.ISOLINES > 0 {
+				b.NumIsolines = int32(x.hdr.Vars.ISOLINES)
+			}
+		}
 	}
 	if o.Type == 0x26 && x.d.Version.R2007 {
 		m.Subclass("AcDb3dSolid")

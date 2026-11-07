@@ -1,7 +1,6 @@
 package conv
 
 import (
-
 	"github.com/LeeBhin/dwgconv/internal/dwg"
 )
 

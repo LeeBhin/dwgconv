@@ -135,7 +135,7 @@ func (x *MLeaderContext) code(c *codec) {
 				}
 			}
 			c.BL(&l.Index)
-			if c.R2010 {
+			if c.R2010 { // per-line overrides: R2010 files only (not the ACAD_MLEADERVER layout of older files)
 				c.BS(&l.LeaderType)
 				c.CMC(&l.Color)
 				c.BL(&l.Lineweight)
@@ -143,7 +143,7 @@ func (x *MLeaderContext) code(c *codec) {
 				c.BL(&l.Override)
 			}
 		}
-		if c.R2010 {
+		if c.R2010 { // root attachment direction: R2010 files only (absent in the ACAD_MLEADERVER layout)
 			c.BS(&r.AttachDir)
 		}
 	}
@@ -204,7 +204,7 @@ func (x *MLeaderContext) code(c *codec) {
 	c.BD3(&x.BaseDir)
 	c.BD3(&x.BaseVert)
 	c.B(&x.NormalRev)
-	if c.R2010 {
+	if c.R2010 { // context top/bottom attachment: R2010 files only
 		c.BS(&x.TopAttach)
 		c.BS(&x.BottomAttach)
 	}
@@ -265,9 +265,13 @@ type MLeader struct {
 	ExtendToText  bool    // 295, R2013+
 }
 
+// The ACAD_MLEADERVER marker EED of pre-R2010 files changes only MLEADERSTYLE (§20.4.87); the
+// entity keeps the layout of its file version (checked bit for bit against R2004/R2007 files).
 func (b *MLeader) data(c *codec, o *Object) {
 	if c.R2010 {
 		c.BS(&b.Version)
+	} else if !c.w {
+		b.Version = 2 // not stored before R2010; DXF 270 is always 2
 	}
 	b.Ctx.code(c)
 	c.BL(&b.Override)
@@ -282,9 +286,7 @@ func (b *MLeader) data(c *codec, o *Object) {
 	c.BS(&b.LeftAttach)
 	c.BS(&b.RightAttach)
 	c.BS(&b.TextAngle)
-	if !c.R2010 {
-		c.BS(&b.Unknown175)
-	}
+	c.BS(&b.Unknown175) // 175 text alignment type — present in every version (the R2010 file 640 misparsed without it)
 	c.CMC(&b.TextColor)
 	c.B(&b.TextFrame)
 	c.CMC(&b.BlockColor)
@@ -292,10 +294,14 @@ func (b *MLeader) data(c *codec, o *Object) {
 	c.BD(&b.BlockRotation)
 	c.BS(&b.AttachType)
 	c.B(&b.Annotative)
-	na := c.BLCount(len(b.Arrows))
-	b.Arrows = Slice(c, b.Arrows, na)
-	for i := range b.Arrows {
-		c.B(&b.Arrows[i].IsDefault)
+	// Arrow head overrides are an entity-level list in files up to R2007 ("-R2007" in §20.4.48, also
+	// with the ACAD_MLEADERVER marker); R2010+ keeps them per leader line in the context data.
+	if !c.R2010 {
+		na := c.BLCount(len(b.Arrows))
+		b.Arrows = Slice(c, b.Arrows, na)
+		for i := range b.Arrows {
+			c.B(&b.Arrows[i].IsDefault)
+		}
 	}
 	nl := c.BLCount(len(b.Labels))
 	b.Labels = Slice(c, b.Labels, nl)
@@ -309,7 +315,7 @@ func (b *MLeader) data(c *codec, o *Object) {
 	c.BS(&b.IPEAlign)
 	c.BS(&b.Justification)
 	c.BD(&b.ScaleFactor)
-	if c.R2010 {
+	if c.R2010 { // entity attachment direction/top/bottom: R2010 files only
 		c.BS(&b.AttachDir)
 		c.BS(&b.TopAttach)
 		c.BS(&b.BottomAttach)
@@ -341,8 +347,10 @@ func (b *MLeader) handles(c *codec, o *Object) {
 	c.H(&b.ArrowHead)
 	c.H(&b.TextStyle)
 	c.H(&b.BlockStyle)
-	for i := range b.Arrows {
-		c.H(&b.Arrows[i].Arrow)
+	if !c.R2010 {
+		for i := range b.Arrows {
+			c.H(&b.Arrows[i].Arrow)
+		}
 	}
 	for i := range b.Labels {
 		c.H(&b.Labels[i].AttDef)

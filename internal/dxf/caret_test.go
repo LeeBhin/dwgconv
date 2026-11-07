@@ -12,7 +12,7 @@ func TestCaretRoundTrip(t *testing.T) {
 		{"{\\Fgdt;r}%%v1%%v2%%v%%v%%v\n10", "{\\Fgdt;r}%%v1%%v2%%v%%v%%v^J10"}, // same as ODA
 		{"a\tb\rc", "a^Ib^Mc"},
 		{"\\S1^2;", "\\S1^2;"}, // MTEXT stack: unchanged
-		{"x^Jy", "x^ Jy"},     // a literal ^J must not read back as a newline
+		{"x^Jy", "x^ Jy"},      // a literal ^J must not read back as a newline
 		{"^ ", "^  "},
 		{"end^", "end^"},
 	}

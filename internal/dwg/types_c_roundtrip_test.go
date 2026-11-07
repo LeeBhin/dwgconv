@@ -75,7 +75,7 @@ func TestCTypesRoundTrip(t *testing.T) {
 		}
 		cRoundTrip(t, ver, 0x1F2, px, func() Body { return &ProxyEntity{} })
 
-		ml := &MLeader{Ctx: MLeaderContext{
+		ml := &MLeader{Version: 2, Ctx: MLeaderContext{
 			Roots: []MLeaderRoot{{ContentValid: true, Lines: []MLeaderLine{{Points: [][3]float64{{0, 0, 0}, {5, 5, 0}},
 				Breaks: []MLeaderLineBreak{{SegmentIndex: 0, Pairs: []MLeaderBreak{{}}}}, Ltype: Ref{5, 1}, Arrow: Ref{5, 2}}}}},
 			Scale: 1, HasText: true, TextLabel: "note", TextStyle: Ref{5, 3}, ColumnSizes: []float64{1, 2}},
@@ -84,6 +84,8 @@ func TestCTypesRoundTrip(t *testing.T) {
 			for i := range ml.Ctx.Roots[0].Lines {
 				ml.Ctx.Roots[0].Lines[i].Ltype, ml.Ctx.Roots[0].Lines[i].Arrow = Ref{}, Ref{}
 			}
+		} else {
+			ml.Arrows = nil // entity-level arrow overrides exist only in the pre-R2010 layout
 		}
 		cRoundTrip(t, ver, 0x1F2, ml, func() Body { return &MLeader{} })
 

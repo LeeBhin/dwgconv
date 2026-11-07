@@ -19,6 +19,7 @@ func TestCMappingsRoundTrip(t *testing.T) {
 		}
 		dc := dwg.DimCommon{Extrusion: [3]float64{0, 0, 1}, TextMidpt: [2]float64{1, 2}, Flags1: 0x0B, UserText: "abc",
 			InsScale: [3]float64{1, 1, 1}, Attachment: 5, LSpaceStyle: 1, LSpaceFactor: 1, ActualMeasure: 12.5}
+		byBlock := dwg.CmColor{RGB: -0x3F000000} // MLEADER colors are raw CmColor values in DXF
 		cases := []*dwg.Object{
 			{Type: 0x19, Body: &dwg.DimRadius{DimCommon: dc, Pt10: [3]float64{1, 1, 0}, Pt15: [3]float64{2, 2, 0}, LeaderLen: 3}},
 			{Type: 0x17, Body: &dwg.DimAng3Pt{DimCommon: dc, Pt13: [3]float64{1, 0, 0}}},
@@ -28,14 +29,17 @@ func TestCMappingsRoundTrip(t *testing.T) {
 				DisplayProps: 7, Brightness: 50, Contrast: 50, ClipBndType: 2, ClipVerts: [][2]float64{{0, 0}, {1, 0}, {1, 1}},
 				ImageDef: dwg.Ref{Code: 5, H: 0x30}, ImageDefReactor: dwg.Ref{Code: 3, H: 0x31}}},
 			{Body: &dwg.Wipeout{Image: dwg.Image{ClipBndType: 1, ClipVerts: [][2]float64{{0, 0}, {1, 1}}}}},
-			{Type: 0x26, Body: &dwg.Acis{Version: 1, Empty2: true, Data: dwg.AcisData{Blocks: [][]byte{cEncodeSAT("400 0 1 0\nbody $-1 $1 $-1 $-1 #\n")}}}},
+			{Type: 0x26, Body: &dwg.Acis{Version: 1, Wireframe: true, IsolinesPresent: true, NumIsolines: 4, Empty2: true, Data: dwg.AcisData{Blocks: [][]byte{cEncodeSAT("400 0 1 0\nbody $-1 $1 $-1 $-1 #\n")}}}},
 			{Type: 0x1F2, Body: &dwg.ProxyEntity{ClassID: 499, DataBits: []byte{0xAB, 0xC0}, NDataBits: 10,
 				Handles: []dwg.Ref{{Code: 5, H: 0x50}, {Code: 4, H: 0x51}}}},
-			{Body: &dwg.MLeader{Ctx: dwg.MLeaderContext{
+			{Body: &dwg.MLeader{Version: 2, Ctx: dwg.MLeaderContext{
 				Roots: []dwg.MLeaderRoot{{ContentValid: true, Lines: []dwg.MLeaderLine{{Points: [][3]float64{{0, 0, 0}, {5, 5, 0}},
-					Breaks: []dwg.MLeaderLineBreak{{SegmentIndex: 0, Pairs: []dwg.MLeaderBreak{{End: [3]float64{1, 1, 1}}}}}}}}},
-				Scale: 1, HasText: true, TextLabel: "note", TextStyle: dwg.Ref{Code: 5, H: 3}, ColumnSizes: []float64{1, 2}},
+					Breaks:     []dwg.MLeaderLineBreak{{SegmentIndex: 0, Pairs: []dwg.MLeaderBreak{{End: [3]float64{1, 1, 1}}}}},
+					LeaderType: 1, Lineweight: -2, Color: byBlock}}}},
+				Scale: 1, HasText: true, TextLabel: "note", TextStyle: dwg.Ref{Code: 5, H: 3}, ColumnSizes: []float64{1, 2},
+				TextColor: byBlock, BgColor: byBlock},
 				Style: dwg.Ref{Code: 5, H: 4}, Arrows: []dwg.MLeaderArrow{{IsDefault: true, Arrow: dwg.Ref{Code: 5, H: 6}}},
+				LeaderColor: byBlock, TextColor: byBlock, BlockColor: byBlock,
 				Labels: []dwg.MLeaderLabel{{AttDef: dwg.Ref{Code: 4, H: 7}, Text: "x", UIIndex: 1, Width: 2}}}},
 			{Body: &dwg.Table{Scale: [3]float64{1, 1, 1}, Extrusion: [3]float64{0, 0, 1}, Flags: 6, ColWidths: []float64{10, 20}, RowHeights: []float64{5},
 				Cells: []dwg.TableCell{{Type: 1, Text: "a"}, {Type: 2, BlockScale: 1, HasAttrs: true,
@@ -44,6 +48,11 @@ func TestCMappingsRoundTrip(t *testing.T) {
 		}
 		for i, o := range cases {
 			o.Handle, o.IsEntity, o.XDicMiss, o.Ent = uint64(0x100+i), true, true, ent()
+			if ml, ok := o.Body.(*dwg.MLeader); ok && !v.R2010 {
+				// per-line overrides exist only in the R2010 layout
+				l := &ml.Ctx.Roots[0].Lines[0]
+				l.LeaderType, l.Lineweight, l.Color = 0, 0, dwg.CmColor{}
+			}
 			if p, ok := o.Body.(*dwg.ProxyEntity); ok {
 				o.Ent.HasGraphic, o.Ent.Graphic = true, []byte{1, 2, 3}
 				if v.R2018 {
