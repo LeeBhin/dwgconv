@@ -1,7 +1,5 @@
 package dwg
 
-import "errors"
-
 func init() {
 	classBodyFactory["ACAD_TABLE"] = func() Body { return &Table{} }
 }
@@ -71,10 +69,12 @@ type TableCell struct {
 	EdgeLW       [4]int16   // 279, 275, 276, 278
 	EdgeVis      [4]int16   // 289, 285, 286, 288
 	Value        Ref        // 344 text cell / 340 block cell
+	Unknown2007  int32      // R2007+
+	CellValue    TableValue // R2007+: the typed cell value (§20.4.99)
 }
 
-// Table is ACAD_TABLE in the pre-R2010 layout (§20.4.96.1). The R2010+ layout embeds
-// TABLECONTENT and is not decoded (objects stay raw). Unverified: no samples contain tables.
+// Table is ACAD_TABLE: the INSERT-like part, then the pre-R2010 cell layout (§20.4.96.1) or, from
+// R2010, the embedded table content (§20.4.96.2). The pre-R2010 layout is unverified: no samples.
 type Table struct {
 	InsPt       [3]float64 // 10
 	Scale       [3]float64 // 41-43
@@ -112,9 +112,19 @@ type Table struct {
 	HasBorderVis     bool
 	BorderVisFlags   int32 // 96
 	BorderVis        [18]int16
-}
 
-var errTableR2010 = errors.New("ACAD_TABLE: R2010+ layout (TABLECONTENT) not decoded")
+	// R2010+ layout (§20.4.96.2): the content replaces the cell structures above.
+	Unknown2010  byte  // RC, 0
+	UnknownH     Ref   // soft pointer, null
+	UnknownBL    int32 // 0
+	Unknown2010B bool  // R2010 only, true
+	Unknown2013  int32 // R2013+, 0
+	Content      TableContent
+	Unknown38    int16 // BS, 38
+	HasBreak     int32
+	Break        TableBreak
+	Ranges       []TableRowRange
+}
 
 // cell override field bits (§20.4.96.1)
 var (
@@ -124,8 +134,13 @@ var (
 )
 
 func (b *Table) data(c *codec, o *Object) {
-	if c.R2010 {
-		panic(errTableR2010)
+	if c.w { // a table decoded from the other layout (DWG to DWG across R2010) is converted first
+		switch {
+		case c.R2010 && len(b.Content.Rows) == 0 && len(b.Cells) > 0:
+			b.ContentFromClassic()
+		case !c.R2010 && len(b.Cells) == 0 && len(b.Content.Rows) > 0:
+			b.ClassicFromContent()
+		}
 	}
 	c.BD3(&b.InsPt)
 	cInsertScale(c, &b.Scale)
@@ -138,6 +153,10 @@ func (b *Table) data(c *codec, o *Object) {
 	if b.HasAttribs {
 		n := c.BLCount(len(b.Attribs))
 		b.Attribs = Slice(c, b.Attribs, n)
+	}
+	if c.R2010 {
+		b.data2010(c)
+		return
 	}
 	c.BS(&b.Flags)
 	c.BD3(&b.HorDir)
@@ -236,9 +255,13 @@ func (t *TableCell) data(c *codec) {
 	c.BD(&t.Rotation)
 	switch t.Type {
 	case 1:
-		// The spec makes the text conditional on the 344 handle being null; that handle
-		// lives in the handle stream, so the text is assumed present (unverified).
-		c.TV(&t.Text)
+		// The spec makes the text conditional on the 344 handle being null; that handle lives in
+		// the handle stream, so the text is assumed present (unverified for R2004). From R2007 the
+		// text is the cell value below and no TV is written (2007 sample: two strings per cell,
+		// format and value string).
+		if !c.R2007 {
+			c.TV(&t.Text)
+		}
 	case 2:
 		c.BD(&t.BlockScale)
 		if c.w {
@@ -255,9 +278,17 @@ func (t *TableCell) data(c *codec) {
 		}
 	}
 	c.B(&t.HasOverride)
-	if !t.HasOverride {
-		return
+	if t.HasOverride {
+		t.codeOverride(c)
 	}
+	if c.R2007 {
+		c.BL(&t.Unknown2007)
+		t.CellValue.code(c)
+	}
+}
+
+// codeOverride codes the cell property overrides (present when the has-override flag is set).
+func (t *TableCell) codeOverride(c *codec) {
 	f := &t.FlagOverride
 	c.BL(f)
 	c.RC(&t.VirtualEdge)
@@ -289,6 +320,43 @@ func (t *TableCell) data(c *codec) {
 	}
 }
 
+// data2010 codes the R2010+ layout after the INSERT-like part (§20.4.96.2).
+func (b *Table) data2010(c *codec) {
+	c.RC(&b.Unknown2010)
+	c.BL(&b.UnknownBL)
+	if c.R2013 {
+		c.BL(&b.Unknown2013)
+	} else {
+		c.B(&b.Unknown2010B)
+	}
+	b.Content.code(c)
+	c.BS(&b.Unknown38)
+	c.BD3(&b.HorDir)
+	c.BL(&b.HasBreak)
+	if b.HasBreak != 0 {
+		br := &b.Break
+		c.BL(&br.Options)
+		c.BL(&br.Flow)
+		c.BD(&br.Spacing)
+		c.BL(&br.Unknown1)
+		c.BL(&br.Unknown2)
+		n := c.BLCount(len(br.Heights))
+		br.Heights = Slice(c, br.Heights, n)
+		for i := range br.Heights {
+			c.BD3(&br.Heights[i].Position)
+			c.BD(&br.Heights[i].Height)
+			c.BL(&br.Heights[i].Flags)
+		}
+	}
+	n := c.BLCount(len(b.Ranges))
+	b.Ranges = Slice(c, b.Ranges, n)
+	for i := range b.Ranges {
+		c.BD3(&b.Ranges[i].Position)
+		c.BL(&b.Ranges[i].StartRow)
+		c.BL(&b.Ranges[i].EndRow)
+	}
+}
+
 func (b *Table) handles(c *codec, o *Object) {
 	c.H(&b.BlockHeader)
 	for i := range b.Attribs {
@@ -296,6 +364,11 @@ func (b *Table) handles(c *codec, o *Object) {
 	}
 	if b.HasAttribs {
 		c.H(&b.SeqEnd)
+	}
+	if c.R2010 {
+		c.H(&b.UnknownH)
+		b.Content.handles(c)
+		return
 	}
 	c.H(&b.TableStyle)
 	for i := range b.Cells {
@@ -308,6 +381,9 @@ func (b *Table) handles(c *codec, o *Object) {
 		}
 		if t.HasOverride && t.FlagOverride&0x10 != 0 {
 			c.H(&t.TextStyle)
+		}
+		if c.R2007 {
+			t.CellValue.handles(c)
 		}
 	}
 	if b.HasTableOverrides {

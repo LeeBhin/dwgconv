@@ -14,7 +14,7 @@ import (
 )
 
 func dump(prefix string, v reflect.Value, depth int) {
-	if depth > 6 || !v.IsValid() {
+	if depth > 12 || !v.IsValid() {
 		return
 	}
 	switch v.Kind() {
@@ -53,7 +53,7 @@ func dump(prefix string, v reflect.Value, depth int) {
 			return
 		}
 		fmt.Printf("%s = [%d]\n", prefix, n)
-		for i := 0; i < n && i < 4; i++ {
+		for i := 0; i < n && i < 400; i++ {
 			dump(fmt.Sprintf("%s[%d]", prefix, i), v.Index(i), depth+1)
 		}
 	default:

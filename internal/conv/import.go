@@ -72,15 +72,14 @@ func FromDXF(f *dxf.File, version string) (dwgData []byte, warnings []string, er
 		if skip[r.Type] { // diagnostics: leave record types out
 			return nil
 		}
+		// the table's classic groups (and, from R2010, its embedded content) carry what the separate
+		// 2008 round-trip objects repeat: those and their xrecord are left out, as ODA does on write
+		if r.Type == "TABLECONTENT" || r.Type == "TABLEGEOMETRY" || isTableRoundTrip(r) {
+			return nil
+		}
 		o := x.importRecord(r, entity)
 		if o == nil {
 			warn = append(warn, r.Type)
-			return nil
-		}
-		// ACAD_TABLE is decoded only in the pre-R2010 layout; R2010+ output needs TABLECONTENT,
-		// which is not encoded — leave the table out (its *T block stays) instead of failing the file.
-		if _, ok := o.Body.(*dwg.Table); ok && d.Version.R2010 {
-			warn = append(warn, r.Type+"(R2010+ table)")
 			return nil
 		}
 		// types with a fixed number keep it (AutoCAD writes LAYOUT, LWPOLYLINE, XRECORD... that way);

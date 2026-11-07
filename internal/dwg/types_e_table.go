@@ -68,6 +68,16 @@ type CellStyle struct {
 }
 
 func (s *CellStyle) code(c *codec, hp bool) {
+	s.codeBody(c, hp)
+	if !hp {
+		c.BL(&s.ID)
+		c.BL(&s.Class)
+		c.TV(&s.Name)
+	}
+}
+
+// codeBody codes the style without the id/class/name trailer (the form embedded in a table content).
+func (s *CellStyle) codeBody(c *codec, hp bool) {
 	if hp {
 		if s.DataFlags&1 != 0 {
 			s.Content.code(c, true)
@@ -108,9 +118,6 @@ func (s *CellStyle) code(c *codec, hp bool) {
 			}
 		}
 	}
-	c.BL(&s.ID)
-	c.BL(&s.Class)
-	c.TV(&s.Name)
 }
 
 // TableStyleRow is a row style of the pre-R2010 TABLESTYLE format (§20.4.101.1).

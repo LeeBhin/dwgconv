@@ -20,6 +20,24 @@ func TestCMappingsRoundTrip(t *testing.T) {
 		dc := dwg.DimCommon{Extrusion: [3]float64{0, 0, 1}, TextMidpt: [2]float64{1, 2}, Flags1: 0x0B, UserText: "abc",
 			InsScale: [3]float64{1, 1, 1}, Attachment: 5, LSpaceStyle: 1, LSpaceFactor: 1, ActualMeasure: 12.5}
 		byBlock := dwg.CmColor{RGB: -0x3F000000} // MLEADER colors are raw CmColor values in DXF
+		// the classic table layout; from R2010 the table holds the content as the import builds it
+		// from the classic groups, and the mapping derives the classic groups from it
+		table := &dwg.Table{Scale: [3]float64{1, 1, 1}, Extrusion: [3]float64{0, 0, 1}, Flags: 6, ColWidths: []float64{10, 20}, RowHeights: []float64{5},
+			Cells: []dwg.TableCell{{Type: 1, Text: "a"}, {Type: 2, BlockScale: 1, HasAttrs: true,
+				Attrs: []dwg.TableAttr{{Text: "v", AttDef: dwg.Ref{Code: 4, H: 0xB}}}}},
+			BlockHeader: dwg.Ref{Code: 5, H: 0xC}, TableStyle: dwg.Ref{Code: 5, H: 0xD}}
+		if v.R2010 {
+			table = &dwg.Table{Scale: [3]float64{1, 1, 1}, Extrusion: [3]float64{0, 0, 1}, Flags: 6, HorDir: [3]float64{1, 0, 0},
+				BlockHeader: dwg.Ref{Code: 5, H: 0xC}, TableStyle: dwg.Ref{Code: 5, H: 0xD},
+				Unknown2010B: true, UnknownH: dwg.Ref{Code: 4}, Unknown38: 38, Ranges: []dwg.TableRowRange{{}},
+				Content: dwg.TableContent{TableStyle: dwg.Ref{Code: 5, H: 0xD}, Style: dwg.CellStyle{Type: 4},
+					Columns: []dwg.TableColumn{{Style: dwg.CellStyle{Type: 3}, Width: 10}, {Style: dwg.CellStyle{Type: 3}, Width: 20}},
+					Rows: []dwg.ContentRow{{Style: dwg.CellStyle{Type: 2}, StyleID: 1, Height: 5, Cells: []dwg.ContentCell{
+						{Style: dwg.CellStyle{Type: 1}, Contents: []dwg.CellContent{{Type: 1, Value: dwg.TableValue{Flags: 6, DataType: 4, Str: "a", ValueStr: "a"}}}},
+						{Style: dwg.CellStyle{Type: 1}, Contents: []dwg.CellContent{{Type: 4, Block: dwg.Ref{Code: 5, H: 0xC},
+							Attrs: []dwg.CellAttr{{Def: dwg.Ref{Code: 4, H: 0xB}, Value: "v", Index: 1}}}}},
+					}}}}}
+		}
 		cases := []*dwg.Object{
 			{Type: 0x19, Body: &dwg.DimRadius{DimCommon: dc, Pt10: [3]float64{1, 1, 0}, Pt15: [3]float64{2, 2, 0}, LeaderLen: 3}},
 			{Type: 0x17, Body: &dwg.DimAng3Pt{DimCommon: dc, Pt13: [3]float64{1, 0, 0}}},
@@ -41,10 +59,7 @@ func TestCMappingsRoundTrip(t *testing.T) {
 				Style: dwg.Ref{Code: 5, H: 4}, Arrows: []dwg.MLeaderArrow{{IsDefault: true, Arrow: dwg.Ref{Code: 5, H: 6}}},
 				LeaderColor: byBlock, TextColor: byBlock, BlockColor: byBlock,
 				Labels: []dwg.MLeaderLabel{{AttDef: dwg.Ref{Code: 4, H: 7}, Text: "x", UIIndex: 1, Width: 2}}}},
-			{Body: &dwg.Table{Scale: [3]float64{1, 1, 1}, Extrusion: [3]float64{0, 0, 1}, Flags: 6, ColWidths: []float64{10, 20}, RowHeights: []float64{5},
-				Cells: []dwg.TableCell{{Type: 1, Text: "a"}, {Type: 2, BlockScale: 1, HasAttrs: true,
-					Attrs: []dwg.TableAttr{{Text: "v", AttDef: dwg.Ref{Code: 4, H: 0xB}}}}},
-				BlockHeader: dwg.Ref{Code: 5, H: 0xC}, TableStyle: dwg.Ref{Code: 5, H: 0xD}}},
+			{Body: table},
 		}
 		for i, o := range cases {
 			o.Handle, o.IsEntity, o.XDicMiss, o.Ent = uint64(0x100+i), true, true, ent()

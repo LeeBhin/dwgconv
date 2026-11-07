@@ -172,8 +172,8 @@ type Leader struct {
 	XDir        [3]float64
 	OffsetBlock [3]float64
 	EndPtProj   [3]float64
-	BoxHeight   float64
-	BoxWidth    float64
+	BoxHeight   float64 // 40; not stored from R2010 on
+	BoxWidth    float64 // 41
 	HookXDir    bool
 	ArrowheadOn bool
 	Unk1        int16 `conv:"derived"`
@@ -196,17 +196,19 @@ func (b *Leader) data(c *codec, o *Object) {
 	c.BD3(&b.XDir)
 	c.BD3(&b.OffsetBlock)
 	c.BD3(&b.EndPtProj)
-	c.BD(&b.BoxHeight)
-	c.BD(&b.BoxWidth)
+	// The spec lists box height and width (BD, BD) here for every version; from R2010 they are
+	// gone: a Teigha-written R2018 file with a MTEXT leader and DXF 40/41 set has the same six tail
+	// bits as AutoCAD's, [B hook][B arrow][BS][B][B], and reading two BDs there fails on an
+	// arrowhead that is on (code 11). ODA rejects an R2004/R2007 leader written without them.
+	if !c.R2010 {
+		c.BD(&b.BoxHeight)
+		c.BD(&b.BoxWidth)
+	}
 	c.B(&b.HookXDir)
 	c.B(&b.ArrowheadOn)
-	// Spec lists "R2000+: BS, B, B" here; R2013 data ends right after ArrowheadOn.
-	// Kept for R2004 per spec (unverified, no R2004 LEADER in samples).
-	if !c.R2010 {
-		c.BS(&b.Unk1)
-		c.B(&b.Unk2)
-		c.B(&b.Unk3)
-	}
+	c.BS(&b.Unk1)
+	c.B(&b.Unk2)
+	c.B(&b.Unk3)
 }
 
 func (b *Leader) handles(c *codec, o *Object) {

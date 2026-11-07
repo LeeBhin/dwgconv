@@ -103,6 +103,20 @@ func TestCTypesRoundTrip(t *testing.T) {
 				BlockHeader: Ref{5, 0xC}, TableStyle: Ref{5, 0xD},
 				HasTableOverrides: true, TableOverride: 0x01 | 0x20 | 0x20000, TitleSuppressed: true, RowTextStyle: [3]Ref{{5, 0xE}}}
 			cRoundTrip(t, ver, 0x1F2, tb, func() Body { return &Table{} })
+		} else {
+			// R2010+ layout: the embedded content with a styled cell, a string value, geometry and a merge
+			tb := &Table{Scale: [3]float64{2, 2, 2}, HorDir: [3]float64{1, 0, 0}, BlockHeader: Ref{5, 0xC}, UnknownH: Ref{4, 0},
+				Unknown2010B: !v.R2013, Unknown38: 38, Ranges: []TableRowRange{{EndRow: 1}},
+				Content: TableContent{Name: "t", TableStyle: Ref{5, 0xD}, Style: CellStyle{Type: 4},
+					Columns: []TableColumn{{Style: CellStyle{Type: 3}, Width: 10}},
+					Rows: []ContentRow{{Style: CellStyle{Type: 2}, StyleID: 1, Height: 5, Cells: []ContentCell{{
+						Style: CellStyle{Type: 1, DataFlags: 1, PropOverride: 0x10, Content: ContentFormat{PropOverride: 0x10, CellAlignment: 5, TextStyle: Ref{5, 0xA}},
+							Borders: []CellBorder{{EdgeFlags: 1, Override: 0x8, Type: 1, Color: CmColor{Index: 1}, Ltype: Ref{5, 0}}}},
+						Contents: []CellContent{{Type: 1, Value: TableValue{Flags: 6, DataType: 4, Str: "a", Bytes: []byte{0x61, 0, 0, 0}, ValueStr: "a"},
+							HasFormat: 1, Format: ContentFormat{TextStyle: Ref{5, 0xA}}}},
+						HasGeom: 1, GeomFlags: 1, UnknownH: Ref{4, 0}, Geometry: CellGeometry{Width: 2}}}}},
+					Merged: [][4]int32{{0, 0, 0, 0}}}}
+			cRoundTrip(t, ver, 0x1F2, tb, func() Body { return &Table{} })
 		}
 	}
 }
